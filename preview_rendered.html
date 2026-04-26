@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spencer's Rewards — Intelligence Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ══ THEME VARIABLES ══ */
+    :root {
+      --bg:#0a0e1a; --bg2:#0f1525; --card:#131929; --card2:#182035;
+      --border:rgba(255,255,255,0.07); --accent:#f5a623; --accent2:#e85d37;
+      --accent3:#4fc3f7; --accent4:#66bb6a; --text:#e8eaf0; --muted:#7a8398;
+      --green:#4caf50; --red:#ef5350; --purple:#ab47bc;
+      --sidebar-w:220px; --nav-h:96px;
+    }
+    body.light-mode {
+      --bg:#f0f3fb; --bg2:#e6eaf5; --card:#ffffff; --card2:#f4f6fc;
+      --border:rgba(0,0,0,0.09); --accent:#d4890e; --accent2:#c04a28;
+      --accent3:#0288d1; --accent4:#2e7d32; --text:#1a2035; --muted:#5a6380;
+      --green:#2e7d32; --red:#c62828; --purple:#6a1b9a;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .25s,color .25s;}
+
+    /* ══ UPLOAD ══ */
+    #upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 20px;
+      background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(245,166,35,.10) 0%,transparent 70%),
+                 radial-gradient(ellipse 60% 50% at 80% 100%,rgba(232,93,55,.08) 0%,transparent 60%),var(--bg);}
+    .upload-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:4px;text-transform:uppercase;color:var(--accent);margin-bottom:48px;display:flex;align-items:center;gap:12px;}
+    .upload-logo .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+    .upload-hero{text-align:center;margin-bottom:52px;max-width:560px;}
+    .upload-hero h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(36px,6vw,58px);line-height:1.1;letter-spacing:-1.5px;margin-bottom:16px;}
+    .upload-hero h1 span{color:var(--accent);}
+    .upload-hero p{color:var(--muted);font-size:16px;line-height:1.6;}
+    .upload-zone{width:100%;max-width:560px;border:2px dashed rgba(245,166,35,.35);border-radius:20px;padding:56px 40px;text-align:center;background:rgba(245,166,35,.03);cursor:pointer;transition:all .3s;}
+    .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(245,166,35,.07);transform:translateY(-2px);}
+    .upload-icon{width:72px;height:72px;margin:0 auto 20px;background:rgba(245,166,35,.15);border-radius:20px;display:flex;align-items:center;justify-content:center;}
+    .upload-icon svg{width:36px;height:36px;fill:var(--accent);}
+    .upload-zone h3{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;margin-bottom:8px;}
+    .upload-zone p{color:var(--muted);font-size:14px;margin-bottom:24px;}
+    .upload-btn{display:inline-block;padding:12px 32px;background:var(--accent);color:#0a0e1a;border-radius:50px;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s;}
+    .upload-btn:hover{filter:brightness(1.1);transform:scale(1.03);}
+    #file-input{display:none;}
+    .upload-meta{margin-top:16px;color:var(--muted);font-size:12px;}
+    .reporting-month-wrap{width:100%;max-width:560px;margin-top:18px;background:rgba(79,195,247,.05);border:1px solid rgba(79,195,247,.25);border-radius:14px;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+    .reporting-month-wrap label{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--accent3);display:flex;align-items:center;gap:8px;}
+    .reporting-month-wrap label span{font-size:16px;}
+    .reporting-month-desc{font-size:11px;color:var(--muted);flex:1;min-width:160px;}
+    select#reporting-month-select{padding:8px 30px 8px 12px;background:var(--card2);border:1.5px solid rgba(79,195,247,.4);border-radius:8px;color:var(--text);font-family:'Syne',sans-serif;font-weight:600;font-size:13px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%234fc3f7'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;transition:border-color .2s;}
+    select#reporting-month-select:focus{border-color:var(--accent3);}
+    #report-month-badge{font-size:11px;padding:3px 10px;background:rgba(79,195,247,.12);border:1px solid rgba(79,195,247,.3);border-radius:50px;color:var(--accent3);white-space:nowrap;flex-shrink:0;display:none;}
+
+    /* ══ LOADING ══ */
+    #loading-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:24px;}
+    .loading-ring{width:72px;height:72px;border:3px solid rgba(245,166,35,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .loading-text{font-family:'Syne',sans-serif;font-size:18px;font-weight:600;color:var(--accent);}
+    .loading-sub{color:var(--muted);font-size:13px;}
+    .progress-bar-wrap{width:300px;height:4px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;}
+    .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .3s;width:0%;}
+
+    /* ══ DASHBOARD SCREEN ══ */
+    #dashboard-screen{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+    /* ── TOP NAV BAR ── */
+    .nav-bar{flex-shrink:0;background:var(--card);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:200;transition:background .25s;}
+    .nav-top{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:52px;border-bottom:1px solid var(--border);gap:8px;flex-wrap:nowrap;}
+    .header-brand{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:2px;color:var(--accent);display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0;}
+    .header-brand .badge{font-size:9px;padding:2px 7px;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);border-radius:50px;color:var(--accent);letter-spacing:1px;}
+    .nav-top-right{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow-x:auto;}
+    .nav-top-right::-webkit-scrollbar{height:0;}
+    #row-count-badge{font-size:11px;padding:3px 10px;background:rgba(79,195,247,.12);border:1px solid rgba(79,195,247,.25);border-radius:50px;color:var(--accent3);white-space:nowrap;flex-shrink:0;}
+    .nav-btn{display:flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid var(--border);border-radius:7px;background:var(--card2);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;font-family:'DM Sans',sans-serif;}
+    .nav-btn:hover{color:var(--text);border-color:rgba(245,166,35,.4);}
+    .nav-btn.active{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.4);color:var(--accent);}
+    .nav-btn .btn-icon{font-size:13px;}
+    .header-reset{padding:5px 11px;background:rgba(232,93,55,.1);border:1px solid rgba(232,93,55,.3);border-radius:7px;color:var(--accent2);font-size:11px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0;}
+    .header-reset:hover{background:rgba(232,93,55,.2);}
+
+    /* Export Dropdown — position:fixed so it escapes the .nav-top-right overflow-clip */
+    .export-wrap{position:relative;flex-shrink:0;}
+    .export-dropdown{display:none;position:fixed;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.4);z-index:9999;min-width:200px;overflow:hidden;animation:fadeIn .15s ease;}
+    .export-dropdown.open{display:block;}
+    .export-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);transition:background .15s;font-family:'DM Sans',sans-serif;}
+    .export-item:hover{background:var(--card2);}
+    .export-item .ei-icon{font-size:16px;width:20px;text-align:center;}
+    .export-item .ei-label{flex:1;}
+    .export-item .ei-ext{font-size:10px;color:var(--muted);padding:2px 6px;background:var(--card2);border-radius:4px;}
+    .export-sep{height:1px;background:var(--border);margin:4px 0;}
+
+    /* ── FILTERS ROW ── */
+    .filters-row{display:flex;align-items:center;gap:6px;padding:6px 16px;overflow-x:auto;border-bottom:1px solid var(--border);}
+    .filters-row::-webkit-scrollbar{height:3px;}
+    .filters-row::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+    .search-box{position:relative;display:flex;align-items:center;flex-shrink:0;}
+    .search-box svg{position:absolute;left:9px;width:13px;height:13px;fill:var(--muted);pointer-events:none;}
+    .search-box input{padding:6px 10px 6px 27px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;width:160px;outline:none;transition:border-color .2s;}
+    .search-box input:focus{border-color:rgba(245,166,35,.5);}
+    .search-box input::placeholder{color:var(--muted);}
+    .f-pill{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+    .f-pill label{font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap;letter-spacing:.3px;}
+    select.fsel{padding:6px 22px 6px 9px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;outline:none;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%237a8398'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 6px center;max-width:110px;transition:border-color .2s;}
+    select.fsel:focus{border-color:rgba(245,166,35,.5);}
+    .f-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;}
+    .clear-btn{padding:5px 11px;background:rgba(232,93,55,.1);border:1px solid rgba(232,93,55,.3);border-radius:7px;color:var(--accent2);font-size:11px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0;}
+    .clear-btn:hover{background:rgba(232,93,55,.2);}
+
+    /* ══ DASHBOARD BODY ══ */
+    .dashboard-body{display:flex;flex:1;min-height:0;overflow:hidden;}
+
+    /* ── LEFT SIDEBAR ── */
+    .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;transition:width .25s,background .25s;}
+    .sidebar::-webkit-scrollbar{width:3px;}
+    .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+    .sidebar-section-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:14px 14px 6px;opacity:.7;}
+    .sidebar-tab{width:100%;display:flex;align-items:center;gap:10px;padding:11px 14px;background:transparent;border:none;border-left:3px solid transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-weight:500;font-size:12.5px;cursor:pointer;transition:all .18s;text-align:left;position:relative;}
+    .sidebar-tab:hover{background:rgba(255,255,255,.04);color:var(--text);}
+    .sidebar-tab.active{background:rgba(245,166,35,.08);border-left-color:var(--accent);color:var(--accent);}
+    .sidebar-tab .tab-icon{font-size:15px;flex-shrink:0;width:20px;text-align:center;}
+    .sidebar-tab .tab-label{flex:1;}
+    .sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid var(--border);}
+    .sidebar-footer-text{font-size:10px;color:var(--muted);text-align:center;opacity:.6;}
+
+    /* ── MAIN CONTENT ── */
+    .main-content{flex:1;overflow-y:auto;overflow-x:hidden;background:var(--bg);transition:background .25s;}
+    .main-content::-webkit-scrollbar{width:5px;}
+    .main-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+
+    /* Mobile top tabs */
+    .mobile-tabs-row{display:none;gap:0;padding:0 12px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;position:sticky;top:0;z-index:10;}
+    .mobile-tabs-row::-webkit-scrollbar{height:0;}
+    .mobile-tab-btn{padding:9px 13px;background:transparent;border:none;border-bottom:3px solid transparent;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.4px;cursor:pointer;transition:all .2s;white-space:nowrap;display:flex;flex-direction:column;align-items:center;gap:2px;}
+    .mobile-tab-btn .m-icon{font-size:14px;}
+    .mobile-tab-btn:hover{color:var(--text);}
+    .mobile-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+    /* ══ TAB CONTENT ══ */
+    .tab-content{display:none !important;padding:20px 20px 60px;animation:fadeIn .3s ease;}
+    .tab-content.active{display:block !important;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+    /* ══ KPI GRID ══ */
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-bottom:22px;}
+    .kpi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 14px;position:relative;overflow:hidden;transition:transform .2s,border-color .2s,background .25s;}
+    .kpi-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.12);}
+    .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0;}
+    .kpi-card.amber::before{background:var(--accent);}
+    .kpi-card.red::before{background:var(--accent2);}
+    .kpi-card.blue::before{background:var(--accent3);}
+    .kpi-card.green::before{background:var(--accent4);}
+    .kpi-card.purple::before{background:var(--purple);}
+    .kpi-label{font-size:10px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+    .kpi-value{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;line-height:1;margin-bottom:4px;}
+    .kpi-sub{font-size:11px;color:var(--muted);}
+    .kpi-delta{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 6px;border-radius:50px;margin-top:4px;}
+    .kpi-delta.pos{background:rgba(76,175,80,.15);color:var(--green);}
+    .kpi-delta.neg{background:rgba(239,83,80,.15);color:var(--red);}
+
+    /* ══ INSIGHTS GRID ══ */
+    .insights-container{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:22px;}
+    .insight-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;gap:11px;align-items:flex-start;transition:background .25s;}
+    .insight-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+    .insight-body h4{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;margin-bottom:3px;}
+    .insight-body p{font-size:11px;color:var(--muted);line-height:1.5;}
+    .insight-body strong{color:var(--accent);}
+
+    /* ══ SECTION LABEL ══ */
+    .section-label{font-family:'Syne',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin-bottom:11px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+    .section-label::before{content:'';width:12px;height:3px;background:var(--accent);border-radius:2px;flex-shrink:0;}
+    .section-label .note{font-size:10px;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;}
+
+    /* ══ CHART CARDS ══ */
+    .charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin-bottom:22px;}
+    .chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;transition:background .25s;}
+    .chart-card.wide{grid-column:1/-1;}
+    .chart-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
+    .chart-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;}
+    .chart-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+    .chart-wrap{position:relative;height:250px;}
+    .chart-wrap.tall{height:320px;}
+    .chart-wrap.short{height:200px;}
+
+    /* ══ AMS TRANSITION MATRIX ══ */
+    .ams-tx-table{width:100%;border-collapse:separate;border-spacing:1px;font-size:11px;font-family:'DM Sans',sans-serif;}
+    .ams-tx-table th{background:rgba(79,195,247,.12);color:var(--text);font-weight:700;padding:6px 8px;text-align:center;white-space:nowrap;font-size:10px;letter-spacing:.3px;border:1px solid var(--border);}
+    .ams-tx-table th.row-h{background:rgba(79,195,247,.18);text-align:left;position:sticky;left:0;z-index:2;}
+    .ams-tx-table th.corner{background:rgba(79,195,247,.22);position:sticky;left:0;z-index:3;}
+    .ams-tx-table td{padding:6px 8px;text-align:center;font-weight:600;color:#fff;min-width:62px;}
+    .ams-tx-table td.diag{background:#4FC3F7;}
+    .ams-tx-table td.up{background:#66BB6A;}
+    .ams-tx-table td.down{background:#F5A623;}
+    .ams-tx-table td.tot,.ams-tx-table th.tot{background:#1F1F2E;color:#fff;font-weight:800;}
+    .ams-tx-table td.empty{background:rgba(255,255,255,.04);color:var(--muted);font-weight:400;}
+    body.light-mode .ams-tx-table td.empty{background:#f0f3fb;color:#5a6380;}
+    body.light-mode .ams-tx-table th{background:#dfeaf7;}
+    body.light-mode .ams-tx-table th.row-h{background:#cfdef0;}
+    body.light-mode .ams-tx-table th.corner{background:#bdd2ea;}
+
+    /* ══ LEADERBOARD ══ */
+    .dual-table-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;}
+    .leaderboard-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+    .leaderboard-item:last-child{border-bottom:none;}
+    .rank-num{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--muted);min-width:24px;}
+    .rank-num.top{color:var(--accent);}
+    .lb-info{flex:1;min-width:0;}
+    .lb-name{font-weight:600;font-size:12px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .lb-meta{font-size:10px;color:var(--muted);}
+    .lb-bar-wrap{width:80px;height:4px;background:rgba(255,255,255,.07);border-radius:3px;flex-shrink:0;}
+    .lb-bar{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+    .lb-bar.bad{background:linear-gradient(90deg,var(--red),#ff7043);}
+    .lb-value{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;min-width:60px;text-align:right;}
+
+    /* ══ TABLE ══ */
+    .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:background .25s;}
+    .table-header-row{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);}
+    .table-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;}
+    .table-pagination{display:flex;align-items:center;gap:6px;}
+    .page-btn{width:26px;height:26px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;}
+    .page-btn:hover:not(:disabled){background:rgba(245,166,35,.15);border-color:rgba(245,166,35,.4);}
+    .page-btn:disabled{opacity:.3;cursor:default;}
+    .page-info{color:var(--muted);font-size:11px;}
+    .data-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .data-table th{padding:10px 14px;background:var(--card2);font-family:'Syne',sans-serif;font-weight:700;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap;border-bottom:1px solid var(--border);}
+    .data-table td{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.03);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
+    .data-table tr:hover td{background:rgba(255,255,255,.02);}
+    .tag{display:inline-block;padding:2px 8px;border-radius:50px;font-size:10px;font-weight:600;}
+    .tag-green{background:rgba(76,175,80,.12);color:var(--green);}
+    .tag-red{background:rgba(239,83,80,.12);color:var(--red);}
+    .tag-blue{background:rgba(79,195,247,.12);color:var(--accent3);}
+    .tag-amber{background:rgba(245,166,35,.12);color:var(--accent);}
+    .tag-muted{background:rgba(255,255,255,.06);color:var(--muted);}
+
+    /* ══ RESPONSIVE VIEW SYSTEM ══ */
+    /* Three-state: mobile / tablet / pc — applied via body[data-view] attribute.
+       JS auto-detects screen size; user can manually override via header toggle. */
+
+    /* Mobile view */
+    body[data-view="mobile"] .sidebar{display:none;}
+    body[data-view="mobile"] .mobile-tabs-row{display:flex;}
+    body[data-view="mobile"] .charts-grid{grid-template-columns:1fr;}
+    body[data-view="mobile"] .chart-card.wide{grid-column:auto;}
+    body[data-view="mobile"] .dual-table-grid{grid-template-columns:1fr;}
+    body[data-view="mobile"] .kpi-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+    body[data-view="mobile"] .tab-content{padding:14px 14px 60px;}
+    body[data-view="mobile"] .search-box input{width:120px;}
+    body[data-view="mobile"] .kpi-value{font-size:20px;}
+
+    /* Tablet view */
+    body[data-view="tablet"] .sidebar{display:none;}
+    body[data-view="tablet"] .mobile-tabs-row{display:flex;}
+    body[data-view="tablet"] .charts-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    body[data-view="tablet"] .chart-card.wide{grid-column:1/-1;}
+    body[data-view="tablet"] .dual-table-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    body[data-view="tablet"] .kpi-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+    body[data-view="tablet"] .tab-content{padding:18px 18px 60px;}
+
+    /* PC view (default) */
+    body[data-view="pc"] .sidebar{display:flex;}
+    body[data-view="pc"] .mobile-tabs-row{display:none;}
+
+    /* ══ TOAST NOTIFICATIONS ══ */
+    #toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+    .toast{padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.4);animation:toastIn .3s ease;display:flex;align-items:center;gap:8px;max-width:320px;}
+    .toast.success{border-left:3px solid var(--green);}
+    .toast.error{border-left:3px solid var(--red);}
+    .toast.info{border-left:3px solid var(--accent3);}
+    @keyframes toastIn{from{transform:translateX(40px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+    @keyframes toastOut{to{transform:translateX(40px);opacity:0;}}
+
+    /* ══ RESTORE BANNER ══ */
+    #restore-banner{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9998;
+      background:var(--card);border:1px solid rgba(79,195,247,.4);border-radius:12px;padding:14px 20px;
+      box-shadow:0 12px 40px rgba(0,0,0,.5);display:flex;align-items:center;gap:14px;max-width:520px;width:90%;}
+    #restore-banner .rb-msg{flex:1;font-size:13px;color:var(--text);}
+    #restore-banner .rb-msg span{color:var(--accent3);font-weight:600;}
+    .rb-btn{padding:7px 16px;border-radius:7px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;border:none;transition:all .2s;}
+    .rb-btn.yes{background:var(--accent3);color:#0a0e1a;}
+    .rb-btn.yes:hover{filter:brightness(1.1);}
+    .rb-btn.no{background:var(--card2);border:1px solid var(--border);color:var(--muted);}
+    .rb-btn.no:hover{color:var(--text);}
+
+    /* ══ DASHBOARD REPORTING MONTH ══ */
+    .rm-dash-pill{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+    .rm-dash-pill label{font-size:10px;color:var(--accent3);font-weight:600;white-space:nowrap;}
+    select#dash-rm{padding:5px 22px 5px 7px;background:var(--card2);border:1.5px solid rgba(79,195,247,.4);
+      border-radius:7px;color:var(--text);font-family:'DM Sans',sans-serif;font-weight:600;font-size:11px;
+      cursor:pointer;outline:none;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%234fc3f7'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 5px center;transition:border-color .2s;}
+    select#dash-rm:focus{border-color:var(--accent3);}
+
+    /* ══ AI PANEL ══ */
+    .ai-sidebar-divider{height:1px;background:var(--border);margin:8px 10px;}
+    #tab-ai{display:none;flex-direction:column;height:100%;padding:0;}
+    #tab-ai.active{display:flex;}
+    .ai-panel-inner{display:flex;flex-direction:column;height:100%;padding:16px 16px 0;}
+    .ai-connect-section{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      flex:1;gap:20px;padding:40px 20px;text-align:center;}
+    .claude-connect-btn{display:flex;align-items:center;gap:12px;padding:14px 28px;
+      background:linear-gradient(135deg,#cc785c 0%,#d4845a 50%,#c96b45 100%);
+      border:none;border-radius:14px;cursor:pointer;transition:all .25s;
+      box-shadow:0 6px 24px rgba(204,120,92,.35);font-family:'Syne',sans-serif;}
+    .claude-connect-btn:hover{transform:translateY(-2px);box-shadow:0 10px 32px rgba(204,120,92,.5);}
+    .claude-connect-btn:active{transform:translateY(0);}
+    .claude-logo{width:28px;height:28px;flex-shrink:0;}
+    .claude-connect-btn span{color:#fff;font-weight:700;font-size:14px;letter-spacing:.3px;}
+    .ai-connect-desc{font-size:12px;color:var(--muted);max-width:300px;line-height:1.6;}
+    .ai-connected-badge{display:none;align-items:center;gap:8px;padding:6px 14px;
+      background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.3);border-radius:50px;
+      font-size:11px;color:var(--green);font-weight:600;}
+    .ai-connected-badge .ai-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+      animation:pulse 2s infinite;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+    /* ── Chat Interface ── */
+    .ai-chat-wrap{display:none;flex-direction:column;height:100%;gap:0;}
+    .ai-chat-header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;
+      border-bottom:1px solid var(--border);margin-bottom:12px;flex-shrink:0;}
+    .ai-chat-header-left{display:flex;align-items:center;gap:10px;}
+    .ai-chat-title{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;}
+    .ai-disconnect-btn{padding:4px 10px;background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.3);
+      border-radius:6px;color:var(--red);font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .ai-disconnect-btn:hover{background:rgba(239,83,80,.2);}
+    .ai-data-pill{font-size:10px;padding:2px 8px;background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.3);
+      border-radius:50px;color:var(--accent3);}
+    .ai-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:12px;}
+    .ai-messages::-webkit-scrollbar{width:3px;}
+    .ai-messages::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px;}
+    .ai-msg{max-width:88%;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.6;animation:fadeIn .2s ease;}
+    .ai-msg.user{align-self:flex-end;background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.25);
+      color:var(--text);border-bottom-right-radius:3px;}
+    .ai-msg.assistant{align-self:flex-start;background:var(--card);border:1px solid var(--border);
+      color:var(--text);border-bottom-left-radius:3px;}
+    .ai-msg.assistant.loading{opacity:.6;}
+    .ai-msg .msg-label{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+      color:var(--muted);margin-bottom:5px;}
+    .ai-msg.user .msg-label{color:rgba(245,166,35,.7);}
+    .ai-msg.assistant .msg-label{color:var(--accent3);opacity:.8;}
+    .ai-input-row{display:flex;gap:8px;padding:10px 0 14px;flex-shrink:0;border-top:1px solid var(--border);}
+    .ai-input-row textarea{flex:1;padding:10px 12px;background:var(--card2);border:1px solid var(--border);
+      border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;
+      resize:none;outline:none;transition:border-color .2s;height:60px;line-height:1.4;}
+    .ai-input-row textarea:focus{border-color:rgba(245,166,35,.5);}
+    .ai-input-row textarea::placeholder{color:var(--muted);}
+    .ai-send-btn{padding:0 16px;background:var(--accent);border:none;border-radius:10px;
+      color:#0a0e1a;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;
+      transition:all .2s;white-space:nowrap;align-self:flex-end;height:44px;}
+    .ai-send-btn:hover{filter:brightness(1.1);}
+    .ai-send-btn:disabled{opacity:.4;cursor:default;}
+    .ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;flex-shrink:0;}
+    .ai-sug-btn{padding:5px 10px;background:var(--card2);border:1px solid var(--border);
+      border-radius:20px;color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;}
+    .ai-sug-btn:hover{border-color:rgba(245,166,35,.4);color:var(--text);}
+    .ai-welcome{align-self:flex-start;background:var(--card);border:1px solid var(--border);
+      border-radius:12px;border-bottom-left-radius:3px;padding:14px 16px;max-width:90%;}
+    .ai-welcome h4{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:6px;color:var(--accent);}
+    .ai-welcome p{font-size:12px;color:var(--muted);line-height:1.5;}
+
+    /* ══ API KEY MODAL ══ */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;
+      display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:var(--card);border:1px solid var(--border);border-radius:20px;
+      padding:36px 32px;width:100%;max-width:460px;box-shadow:0 24px 80px rgba(0,0,0,.6);
+      animation:fadeIn .25s ease;position:relative;}
+    .modal-close{position:absolute;top:16px;right:16px;width:28px;height:28px;
+      background:var(--card2);border:1px solid var(--border);border-radius:7px;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      color:var(--muted);font-size:16px;transition:all .2s;}
+    .modal-close:hover{color:var(--text);background:rgba(239,83,80,.1);border-color:rgba(239,83,80,.3);}
+    .modal-header{display:flex;align-items:center;gap:14px;margin-bottom:24px;}
+    .modal-logo-wrap{width:52px;height:52px;border-radius:14px;
+      background:linear-gradient(135deg,#cc785c,#c96b45);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;}
+    .modal-subtitle{font-size:12px;color:var(--muted);margin-top:3px;}
+    .modal-notice{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.2);
+      border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:12px;
+      color:var(--muted);line-height:1.6;}
+    .modal-notice strong{color:var(--accent);}
+    .modal-field label{display:block;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;
+      letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+    .modal-field input{width:100%;padding:12px 14px;background:var(--card2);border:1.5px solid var(--border);
+      border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;
+      outline:none;transition:border-color .2s;letter-spacing:.5px;}
+    .modal-field input:focus{border-color:rgba(204,120,92,.6);}
+    .modal-field input::placeholder{color:var(--muted);letter-spacing:0;}
+    .modal-actions{display:flex;gap:10px;margin-top:20px;}
+    .modal-save-btn{flex:1;padding:13px;background:linear-gradient(135deg,#cc785c,#c96b45);
+      border:none;border-radius:11px;color:#fff;font-family:'Syne',sans-serif;font-weight:700;
+      font-size:14px;cursor:pointer;transition:all .2s;}
+    .modal-save-btn:hover{filter:brightness(1.1);}
+    .modal-cancel-btn{padding:13px 20px;background:var(--card2);border:1px solid var(--border);
+      border-radius:11px;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;
+      font-size:13px;cursor:pointer;transition:all .2s;}
+    .modal-cancel-btn:hover{color:var(--text);}
+    .modal-internet-note{margin-top:14px;font-size:11px;color:var(--muted);text-align:center;
+      display:flex;align-items:center;justify-content:center;gap:5px;}
+    .modal-internet-note .wifi-icon{font-size:13px;}
+
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ TOAST CONTAINER ══════════════ -->
+<div id="toast-container"></div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div id="dashboard-screen">
+
+  <!-- NAV BAR -->
+  <div class="nav-bar">
+    <div class="nav-top">
+      <div class="header-brand">Spencer's Rewards <span class="badge">LIVE INSIGHTS</span></div>
+      <div class="nav-top-right">
+        <span id="row-count-badge">0 records</span>
+        <span id="report-month-badge">📅 —</span>
+
+        <!-- Responsive view toggle: cycles Auto → Mobile → Tablet → PC -->
+        <button class="nav-btn" id="view-toggle-btn" onclick="toggleViewMode()">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-label" id="view-toggle-label">Auto View</span>
+        </button>
+
+        <!-- Dark / Light mode toggle -->
+        <button class="nav-btn" id="theme-toggle-btn" onclick="toggleTheme()">
+          <span class="btn-icon" id="theme-icon">☀️</span>
+          <span class="btn-label" id="theme-label">Light Mode</span>
+        </button>
+
+        <!-- Export dropdown -->
+        <div class="export-wrap" id="export-wrap">
+          <button class="nav-btn" id="export-btn" onclick="toggleExport(event)">
+            <span class="btn-icon">⬇️</span>
+            <span class="btn-label">Export</span>
+          </button>
+          <div class="export-dropdown" id="export-dropdown">
+            <div class="export-item" onclick="exportCSV()">
+              <span class="ei-icon">📄</span><span class="ei-label">Export Data</span><span class="ei-ext">CSV</span>
+            </div>
+            <div class="export-item" onclick="exportExcel()">
+              <span class="ei-icon">📊</span><span class="ei-label">Spreadsheet</span><span class="ei-ext">XLSX</span>
+            </div>
+            <div class="export-sep"></div>
+            <div class="export-item" onclick="exportPDF()">
+              <span class="ei-icon">📕</span><span class="ei-label">Current Tab</span><span class="ei-ext">PDF</span>
+            </div>
+            <div class="export-item" onclick="exportJPEG()">
+              <span class="ei-icon">🖼️</span><span class="ei-label">Screenshot</span><span class="ei-ext">JPEG</span>
+            </div>
+            <div class="export-sep"></div>
+            <div class="export-item" onclick="exportPPTX()">
+              <span class="ei-icon">📑</span><span class="ei-label">KPI Deck</span><span class="ei-ext">PPTX</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Filters Row -->
+    <div class="filters-row">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16a6.47 6.47 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="search-input" placeholder="Search customer / store…" oninput="applyFilters()" />
+      </div>
+      <div class="f-sep"></div>
+      <div class="f-pill"><label>Region</label><select class="fsel" id="filter-region" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>City</label><select class="fsel" id="filter-city" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>Cluster</label><select class="fsel" id="filter-cluster" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>Store</label><select class="fsel" id="filter-store" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>Format</label><select class="fsel" id="filter-format" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>Shopper</label><select class="fsel" id="filter-shopper" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>Cust Type</label><select class="fsel" id="filter-custtype" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-pill"><label>Month</label><select class="fsel" id="filter-month" onchange="applyFilters()"><option value="">All</option></select></div>
+      <div class="f-sep"></div>
+      <button class="clear-btn" onclick="clearFilters()">✕ Clear Filters</button>
+      <div class="f-sep"></div>
+      <div class="rm-dash-pill">
+        <label>📅 Month</label>
+        <select id="dash-rm" onchange="changeDashReportingMonth(this.value)">
+          <option value="Jan-25">Jan-25</option><option value="Feb-25">Feb-25</option><option value="Mar-25">Mar-25</option>
+          <option value="Apr-25">Apr-25</option><option value="May-25">May-25</option><option value="Jun-25">Jun-25</option>
+          <option value="Jul-25">Jul-25</option><option value="Aug-25">Aug-25</option><option value="Sep-25">Sep-25</option>
+          <option value="Oct-25">Oct-25</option><option value="Nov-25">Nov-25</option><option value="Dec-25">Dec-25</option>
+          <option value="Jan-26">Jan-26</option><option value="Feb-26">Feb-26</option><option value="Mar-26">Mar-26</option>
+          <option value="Apr-26">Apr-26</option><option value="May-26">May-26</option><option value="Jun-26">Jun-26</option>
+          <option value="Jul-26">Jul-26</option><option value="Aug-26">Aug-26</option><option value="Sep-26">Sep-26</option>
+          <option value="Oct-26">Oct-26</option><option value="Nov-26">Nov-26</option><option value="Dec-26">Dec-26</option>
+        </select>
+      </div>
+
+    </div>
+  </div><!-- /nav-bar -->
+
+  <!-- DASHBOARD BODY -->
+  <div class="dashboard-body">
+
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section-label">Analytics</div>
+      <button class="sidebar-tab active" onclick="switchTab('overview',this)" data-tab="overview">
+        <span class="tab-icon">📊</span><span class="tab-label">Overview</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('returnrate',this)" data-tab="returnrate">
+        <span class="tab-icon">🔄</span><span class="tab-label">Return Rate</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('customers',this)" data-tab="customers">
+        <span class="tab-icon">👥</span><span class="tab-label">Customers</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('stores',this)" data-tab="stores">
+        <span class="tab-icon">🏪</span><span class="tab-label">Stores</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('cashback',this)" data-tab="cashback">
+        <span class="tab-icon">💳</span><span class="tab-label">Cashback &amp; Sales</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('geography',this)" data-tab="geography">
+        <span class="tab-icon">🗺️</span><span class="tab-label">Geography</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('lostsales',this)" data-tab="lostsales">
+        <span class="tab-icon">📉</span><span class="tab-label">Lost Sales</span>
+      </button>
+      <button class="sidebar-tab" onclick="switchTab('explorer',this)" data-tab="explorer">
+        <span class="tab-icon">🔍</span><span class="tab-label">Data Explorer</span>
+      </button>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-text">Spencer's Intelligence v3</div>
+      </div>
+    </div><!-- /sidebar -->
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content" id="main-content">
+
+      <!-- Mobile-only top tab row -->
+      <div class="mobile-tabs-row" id="mobile-tabs-row">
+        <button class="mobile-tab-btn active" onclick="switchTab('overview',this)" data-tab="overview"><span class="m-icon">📊</span>Overview</button>
+        <button class="mobile-tab-btn" onclick="switchTab('returnrate',this)" data-tab="returnrate"><span class="m-icon">🔄</span>Ret. Rate</button>
+        <button class="mobile-tab-btn" onclick="switchTab('customers',this)" data-tab="customers"><span class="m-icon">👥</span>Customers</button>
+        <button class="mobile-tab-btn" onclick="switchTab('stores',this)" data-tab="stores"><span class="m-icon">🏪</span>Stores</button>
+        <button class="mobile-tab-btn" onclick="switchTab('cashback',this)" data-tab="cashback"><span class="m-icon">💳</span>Cashback</button>
+        <button class="mobile-tab-btn" onclick="switchTab('geography',this)" data-tab="geography"><span class="m-icon">🗺️</span>Geo</button>
+        <button class="mobile-tab-btn" onclick="switchTab('lostsales',this)" data-tab="lostsales"><span class="m-icon">📉</span>Lost Sales</button>
+        <button class="mobile-tab-btn" onclick="switchTab('explorer',this)" data-tab="explorer"><span class="m-icon">🔍</span>Explorer</button>
+        
+      </div>
+
+      <!-- TAB: OVERVIEW -->
+      <div class="tab-content active" id="tab-overview">
+        <div class="section-label">Key Performance Indicators</div>
+        <div class="kpi-grid" id="overview-kpis"></div>
+        <div class="section-label">Smart Insights</div>
+        <div class="insights-container" id="overview-insights"></div>
+        <div class="section-label">Sales &amp; Behaviour Breakdown</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Shopper Behaviour</div><div class="chart-sub">Shopped vs Not Shopped</div></div></div><div class="chart-wrap short"><canvas id="chart-shopper"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Customer Type Mix</div><div class="chart-sub">New vs Existing</div></div></div><div class="chart-wrap short"><canvas id="chart-custtype"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Bill Slab Distribution</div><div class="chart-sub">Transaction value buckets</div></div></div><div class="chart-wrap"><canvas id="chart-billslab"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Format Type Share</div><div class="chart-sub">Hyper / Daily / Super</div></div></div><div class="chart-wrap short"><canvas id="chart-format"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Enrollment Trend</div><div class="chart-sub">Monthly new member enrollments</div></div></div><div class="chart-wrap"><canvas id="chart-enroll-trend"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: RETURN RATE -->
+      <div class="tab-content" id="tab-returnrate">
+        <div class="section-label">Return Rate KPIs <span class="note" id="rr-window-note">Definition: customers enrolled in any month BEFORE the reporting month who shopped in the reporting month ÷ total such customers</span></div>
+        <div class="kpi-grid" id="rr-kpis"></div>
+        <div class="section-label">AMS Slab Transition — Past 6M Average vs Current Month</div>
+        <div class="charts-grid">
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">AMS Slab Movement: Past → Current</div><div class="chart-sub">How customer spend brackets are shifting — orange = current month, blue = past 6M avg</div></div></div><div class="chart-wrap tall"><canvas id="chart-ams-transition"></canvas></div></div>
+        </div>
+        <div class="section-label">AMS Slab Transition Matrix (Waterfall) <span class="note">Rows = past 6M slab · Cols = current slab · 🟦 stayed · 🟩 upgraded · 🟧 downgraded</span></div>
+        <div class="kpi-grid" id="ams-transition-kpis"></div>
+        <div class="chart-card wide" style="overflow-x:auto;margin-bottom:22px;">
+          <div class="chart-header"><div><div class="chart-title">Past 6M AMS Slab → Current AMS Slab</div><div class="chart-sub">Cell = customer count moving from row slab to column slab</div></div></div>
+          <div id="ams-transition-matrix"></div>
+        </div>
+        <div class="section-label">Return Rate — Region, Cluster &amp; Store Level</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Return Rate by Region</div><div class="chart-sub">% of existing customers who returned</div></div></div><div class="chart-wrap"><canvas id="chart-rr-region"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Return Rate by Cluster</div><div class="chart-sub">% of existing customers who returned</div></div></div><div class="chart-wrap"><canvas id="chart-rr-cluster"></canvas></div></div>
+        </div>
+        <div class="section-label">Top 10 &amp; Bottom 10 Stores — Return Rate</div>
+        <div class="dual-table-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">🏆 Top 10 — Return Rate</div><div class="chart-sub">Stores with highest customer return</div></div></div><div id="rr-top10"></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">⚠️ Bottom 10 — Return Rate</div><div class="chart-sub">Stores needing win-back campaigns</div></div></div><div id="rr-bot10"></div></div>
+        </div>
+        <div class="section-label">Top 10 &amp; Bottom 10 Stores — Enrollment Count</div>
+        <div class="dual-table-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">🏆 Top 10 — Enrollment</div><div class="chart-sub">Most members enrolled overall</div></div></div><div id="enroll-top10"></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">⚠️ Bottom 10 — Enrollment</div><div class="chart-sub">Fewest members enrolled</div></div></div><div id="enroll-bot10"></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: CUSTOMERS -->
+      <div class="tab-content" id="tab-customers">
+        <div class="section-label">Customer KPIs <span class="note">Incremental Sales &amp; NOB calculated for ALL shopped customers</span></div>
+        <div class="kpi-grid" id="customer-kpis"></div>
+        <div class="section-label">Incremental Sales — Region, Cluster &amp; Store</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Incremental Sales by Region</div><div class="chart-sub">Current vs 6M avg baseline</div></div></div><div class="chart-wrap"><canvas id="chart-inc-region"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Incremental Sales by Cluster</div><div class="chart-sub">Current vs 6M avg baseline</div></div></div><div class="chart-wrap"><canvas id="chart-inc-cluster"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Incremental Sales — Top 15 Stores</div><div class="chart-sub">Green = growth, Red = decline vs baseline</div></div></div><div class="chart-wrap tall"><canvas id="chart-inc-store"></canvas></div></div>
+        </div>
+        <div class="section-label">Incremental NOB — Shopped Customers — Region, Cluster &amp; Store</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Incremental NOB by Region</div></div></div><div class="chart-wrap"><canvas id="chart-nob-region"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Incremental NOB by Cluster</div></div></div><div class="chart-wrap"><canvas id="chart-nob-cluster"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Incremental NOB — Top 15 Stores</div></div></div><div class="chart-wrap tall"><canvas id="chart-nob-store"></canvas></div></div>
+        </div>
+        <div class="section-label">Spend Distribution</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Avg Spend — New vs Existing</div></div></div><div class="chart-wrap"><canvas id="chart-avg-spend"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Current AMS Slab Distribution</div></div></div><div class="chart-wrap"><canvas id="chart-ams-slab"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: STORES -->
+      <div class="tab-content" id="tab-stores">
+        <div class="section-label">Store Performance</div>
+        <div class="kpi-grid" id="store-kpis"></div>
+        <div class="charts-grid">
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Top 15 Stores by Revenue</div></div></div><div class="chart-wrap tall"><canvas id="chart-top-stores"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Stores by Format</div></div></div><div class="chart-wrap short"><canvas id="chart-store-format"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Avg Basket Size by Format</div></div></div><div class="chart-wrap"><canvas id="chart-basket-format"></canvas></div></div>
+        </div>
+        <div class="section-label">Store Leaderboard</div>
+        <div class="chart-card"><div id="store-leaderboard"></div></div>
+      </div>
+
+      <!-- TAB: CASHBACK -->
+      <div class="tab-content" id="tab-cashback">
+        <div class="section-label">Cashback &amp; Redemption KPIs</div>
+        <div class="kpi-grid" id="cashback-kpis"></div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Cashback Earned vs Redeemed</div></div></div><div class="chart-wrap"><canvas id="chart-cb-comparison"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Redemption Rate by Format</div></div></div><div class="chart-wrap"><canvas id="chart-redemption-rate"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Top 10 Cities — Cashback Earned</div></div></div><div class="chart-wrap"><canvas id="chart-cb-city"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: GEOGRAPHY -->
+      <div class="tab-content" id="tab-geography">
+        <div class="section-label">Geographic Breakdown</div>
+        <div class="kpi-grid" id="geo-kpis"></div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Revenue by Region</div></div></div><div class="chart-wrap short"><canvas id="chart-region-rev"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Customer Count by Region</div></div></div><div class="chart-wrap"><canvas id="chart-region-cust"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Top 15 Cities — Total Revenue</div></div></div><div class="chart-wrap tall"><canvas id="chart-city-rev"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: LOST SALES -->
+      <div class="tab-content" id="tab-lostsales">
+        <div class="section-label">Lost Sales &amp; NOB</div>
+        <div class="kpi-grid" id="lost-kpis"></div>
+        <div class="section-label">Lost Sales — Region, Cluster &amp; Store Level</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Lost Sales by Region</div></div></div><div class="chart-wrap"><canvas id="chart-lost-region"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Lost Sales by Cluster</div></div></div><div class="chart-wrap"><canvas id="chart-lost-cluster"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Lost Sales — Top 15 Stores</div></div></div><div class="chart-wrap tall"><canvas id="chart-lost-store"></canvas></div></div>
+        </div>
+        <div class="section-label">Lost NOB — Region, Cluster &amp; Store Level</div>
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Lost NOB by Region</div></div></div><div class="chart-wrap"><canvas id="chart-lostnob-region"></canvas></div></div>
+          <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Lost NOB by Cluster</div></div></div><div class="chart-wrap"><canvas id="chart-lostnob-cluster"></canvas></div></div>
+          <div class="chart-card wide"><div class="chart-header"><div><div class="chart-title">Lost NOB — Top 15 Stores</div></div></div><div class="chart-wrap tall"><canvas id="chart-lostnob-store"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- TAB: EXPLORER -->
+      <div class="tab-content" id="tab-explorer">
+        <div class="table-wrap">
+          <div class="table-header-row">
+            <div class="table-title">Data Explorer</div>
+            <div class="table-pagination">
+              <span class="page-info" id="page-info">Page 1 of 1</span>
+              <button class="page-btn" id="prev-btn" onclick="changePage(-1)" disabled>‹</button>
+              <button class="page-btn" id="next-btn" onclick="changePage(1)">›</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto"><table class="data-table"><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+        </div>
+      </div>
+
+      </div><!-- /main-content -->
+  </div><!-- /dashboard-body -->
+</div><!-- /dashboard-screen -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  EMBEDDED DATA — injected by the Python host
+// ═══════════════════════════════════════════════════════════════
+const __EMBEDDED_DATA__ = [{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0000","city_name":"Hyderabad","cluster_name":"Hyderabad-West","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Oct-25","current_bill_value":8000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":6200.0,"current_nob":0.0,"past_six_months_average_nob":6.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":800.0,"bill_slab":"<=25K","msr_number":"9281322581"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0001","city_name":"Kolkata","cluster_name":"Hyderabad-West","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":8000.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":0.0,"incremental_sales":6200.0,"current_nob":3.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":400.0,"bill_slab":"<=25K","msr_number":"9304514849"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0002","city_name":"Hyderabad","cluster_name":"Kolkata-Central","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":8000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":-1000.0,"current_nob":2.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":444.44,"bill_slab":"<=25K","msr_number":"9548012387"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0003","city_name":"Delhi","cluster_name":"Hyderabad-West","region_name":"North","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Jan-26","current_bill_value":0.0,"cashback_earned_current_month":null,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":3.0,"past_six_months_average_nob":3.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9304218413"},{"store_code":"S1003","store_name":"Spencer's Bangalore-3","customer_name":"Customer 0004","city_name":"Hyderabad","cluster_name":"Bangalore-East","region_name":"East","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":60000.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":0.0,"incremental_sales":59200.0,"current_nob":5.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":12000.0,"bill_slab":">50K_<75K","msr_number":"9279917381"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0005","city_name":"Bangalore","cluster_name":"Bangalore-East","region_name":"East","format_type":"Super","shopper_behaviour":"Not Shopped","enroll_month":"Oct-25","current_bill_value":0.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":50.0,"incremental_sales":0.0,"current_nob":5.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":0.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9869572005"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0006","city_name":"Mumbai","cluster_name":"Hyderabad-West","region_name":"West","format_type":"Super","shopper_behaviour":"Not Shopped","enroll_month":"Jan-26","current_bill_value":0.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":50.0,"incremental_sales":0.0,"current_nob":6.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9152472467"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0007","city_name":"Hyderabad","cluster_name":"Delhi-NCR","region_name":"North","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":1500.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":0.0,"incremental_sales":null,"current_nob":0.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":187.5,"bill_slab":"<=25K","msr_number":"9794397171"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0008","city_name":"Delhi","cluster_name":"Hyderabad-West","region_name":"West","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":1500.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":-7500.0,"current_nob":2.0,"past_six_months_average_nob":9.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":100.0,"bill_slab":"<=25K","msr_number":"9408331696"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0009","city_name":"Mumbai","cluster_name":"Bangalore-East","region_name":"West","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":4500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":50.0,"incremental_sales":-4500.0,"current_nob":0.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":750.0,"bill_slab":"<=25K","msr_number":"9912342155"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0010","city_name":"Delhi","cluster_name":"Bangalore-East","region_name":"East","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":8000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":6200.0,"current_nob":1.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":1142.86,"bill_slab":"<=25K","msr_number":"9684861940"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0011","city_name":"Mumbai","cluster_name":"Delhi-NCR","region_name":"North","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Nov-25","current_bill_value":22000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":21200.0,"current_nob":7.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":3142.86,"bill_slab":"<=25K","msr_number":"9502334336"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0012","city_name":"Mumbai","cluster_name":"Hyderabad-West","region_name":"West","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":4500.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":2700.0,"current_nob":4.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":null,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":195.65,"bill_slab":"<=25K","msr_number":"9526140460"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0013","city_name":"Hyderabad","cluster_name":"Bangalore-East","region_name":"East","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":1500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":-2000.0,"current_nob":5.0,"past_six_months_average_nob":6.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":214.29,"bill_slab":"<=25K","msr_number":"9206986826"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0014","city_name":"Chennai","cluster_name":"Mumbai-South","region_name":"West","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Oct-25","current_bill_value":4500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":1000.0,"current_nob":6.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":500.0,"bill_slab":"<=25K","msr_number":"9827426323"},{"store_code":"S1000","store_name":"Spencer's Kolkata-0","customer_name":null,"city_name":"Mumbai","cluster_name":"Hyderabad-West","region_name":"South","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":1500.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":-300.0,"current_nob":1.0,"past_six_months_average_nob":8.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":62.5,"bill_slab":"<=25K","msr_number":"9181835942"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0016","city_name":"Kolkata","cluster_name":"Kolkata-Central","region_name":"East","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Dec-25","current_bill_value":0.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":50.0,"incremental_sales":0.0,"current_nob":2.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9943131834"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0017","city_name":"Kolkata","cluster_name":"Hyderabad-West","region_name":"East","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Oct-25","current_bill_value":0.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":2.0,"past_six_months_average_nob":9.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9550667066"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0018","city_name":"Kolkata","cluster_name":"Hyderabad-West","region_name":"North","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":22000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":18500.0,"current_nob":6.0,"past_six_months_average_nob":8.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":2200.0,"bill_slab":"<=25K","msr_number":"9743866415"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0019","city_name":"Kolkata","cluster_name":"Delhi-NCR","region_name":"North","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":1500.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":0.0,"incremental_sales":-16500.0,"current_nob":7.0,"past_six_months_average_nob":9.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":115.38,"bill_slab":"<=25K","msr_number":"9549248297"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0020","city_name":"Kolkata","cluster_name":"Bangalore-East","region_name":"East","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Feb-26","current_bill_value":60000.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":0.0,"incremental_sales":51000.0,"current_nob":3.0,"past_six_months_average_nob":6.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":3000.0,"bill_slab":">50K_<75K","msr_number":"9806287103"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0021","city_name":"Mumbai","cluster_name":"Hyderabad-West","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":22000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":18500.0,"current_nob":0.0,"past_six_months_average_nob":3.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":3142.86,"bill_slab":"<=25K","msr_number":"9202355940"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0022","city_name":"Kolkata","cluster_name":"Hyderabad-West","region_name":"West","format_type":"Daily","shopper_behaviour":"Not Shopped","enroll_month":"Oct-25","current_bill_value":0.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":1.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9842197770"},{"store_code":"S1000","store_name":"Spencer's Kolkata-0","customer_name":"Customer 0023","city_name":"Hyderabad","cluster_name":"Bangalore-East","region_name":"North","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":8000.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":50.0,"incremental_sales":8000.0,"current_nob":6.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":0.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":2000.0,"bill_slab":"<=25K","msr_number":"9486333695"},{"store_code":"S1003","store_name":"Spencer's Bangalore-3","customer_name":"Customer 0024","city_name":"Kolkata","cluster_name":"Mumbai-South","region_name":"West","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Oct-25","current_bill_value":0.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":0.0,"current_nob":1.0,"past_six_months_average_nob":6.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9614109385"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0025","city_name":"Hyderabad","cluster_name":"Delhi-NCR","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":8000.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":50.0,"incremental_sales":8000.0,"current_nob":6.0,"past_six_months_average_nob":9.0,"past_six_months_average_ams":0.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":400.0,"bill_slab":"<=25K","msr_number":"9981613611"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0026","city_name":"Delhi","cluster_name":"Kolkata-Central","region_name":"East","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":22000.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":0.0,"incremental_sales":20200.0,"current_nob":5.0,"past_six_months_average_nob":6.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":1157.89,"bill_slab":"<=25K","msr_number":"9324818834"},{"store_code":"S1003","store_name":"Spencer's Bangalore-3","customer_name":"Customer 0027","city_name":"Delhi","cluster_name":"Hyderabad-West","region_name":"South","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":1500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":700.0,"current_nob":2.0,"past_six_months_average_nob":7.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":88.24,"bill_slab":"<=25K","msr_number":"9953972132"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0028","city_name":"Bangalore","cluster_name":"Bangalore-East","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":22000.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":50.0,"incremental_sales":18500.0,"current_nob":1.0,"past_six_months_average_nob":7.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":22000.0,"bill_slab":"<=25K","msr_number":"9131632454"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0029","city_name":"Hyderabad","cluster_name":"Delhi-NCR","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Oct-25","current_bill_value":60000.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":0.0,"incremental_sales":51000.0,"current_nob":7.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":20000.0,"bill_slab":">50K_<75K","msr_number":"9820795757"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0030","city_name":"Hyderabad","cluster_name":"Delhi-NCR","region_name":"North","format_type":"Daily","shopper_behaviour":"Not Shopped","enroll_month":"Jan-26","current_bill_value":0.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":0.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9528335796"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0031","city_name":"Hyderabad","cluster_name":"Bangalore-East","region_name":"East","format_type":"Super","shopper_behaviour":"Not Shopped","enroll_month":"Oct-25","current_bill_value":0.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":200.0,"incremental_sales":0.0,"current_nob":5.0,"past_six_months_average_nob":7.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9929461118"},{"store_code":"S1002","store_name":"Spencer's Delhi-2","customer_name":"Customer 0032","city_name":"Hyderabad","cluster_name":"Kolkata-Central","region_name":"West","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Dec-25","current_bill_value":0.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":7.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9494113632"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0033","city_name":"Kolkata","cluster_name":"Bangalore-East","region_name":"South","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Feb-26","current_bill_value":0.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":50.0,"incremental_sales":0.0,"current_nob":3.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9343870464"},{"store_code":"S1003","store_name":"Spencer's Bangalore-3","customer_name":"Customer 0034","city_name":"Hyderabad","cluster_name":"Bangalore-East","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":1500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":-16500.0,"current_nob":3.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":136.36,"bill_slab":"<=25K","msr_number":"9371734651"},{"store_code":"S1000","store_name":"Spencer's Kolkata-0","customer_name":"Customer 0035","city_name":"Chennai","cluster_name":"Hyderabad-West","region_name":"North","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Oct-25","current_bill_value":8000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":-10000.0,"current_nob":1.0,"past_six_months_average_nob":6.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9660983383"},{"store_code":"S1002","store_name":"Spencer's Delhi-2","customer_name":"Customer 0036","city_name":"Hyderabad","cluster_name":"Hyderabad-West","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":8000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":-10000.0,"current_nob":0.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9146492125"},{"store_code":"S1006","store_name":"Spencer's Park St","customer_name":"Customer 0037","city_name":"Hyderabad","cluster_name":"Kolkata-Central","region_name":"East","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Oct-25","current_bill_value":22000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":50.0,"incremental_sales":13000.0,"current_nob":3.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":1100.0,"bill_slab":"<=25K","msr_number":"9510574924"},{"store_code":"S1000","store_name":"Spencer's Kolkata-0","customer_name":"Customer 0038","city_name":"Kolkata","cluster_name":"Delhi-NCR","region_name":"North","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Mar-26","current_bill_value":0.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":5.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":0.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9982184305"},{"store_code":"S1000","store_name":"Spencer's Kolkata-0","customer_name":"Customer 0039","city_name":"Chennai","cluster_name":"Bangalore-East","region_name":"West","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":22000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":21200.0,"current_nob":4.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":2444.44,"bill_slab":"<=25K","msr_number":"9588711491"},{"store_code":"S1002","store_name":"Spencer's Delhi-2","customer_name":"Customer 0040","city_name":"Delhi","cluster_name":"Hyderabad-West","region_name":"West","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Feb-26","current_bill_value":8000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":6200.0,"current_nob":1.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":347.83,"bill_slab":"<=25K","msr_number":"9557517463"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0041","city_name":"Bangalore","cluster_name":"Delhi-NCR","region_name":"South","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":1500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":-2000.0,"current_nob":1.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":62.5,"bill_slab":"<=25K","msr_number":"9856103444"},{"store_code":"S1002","store_name":"Spencer's Delhi-2","customer_name":"Customer 0042","city_name":"Delhi","cluster_name":"Bangalore-East","region_name":"East","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Feb-26","current_bill_value":4500.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":50.0,"incremental_sales":1000.0,"current_nob":5.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":264.71,"bill_slab":"<=25K","msr_number":"9654979529"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0043","city_name":"Mumbai","cluster_name":"Mumbai-South","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":60000.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":0.0,"incremental_sales":60000.0,"current_nob":4.0,"past_six_months_average_nob":7.0,"past_six_months_average_ams":0.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":2608.7,"bill_slab":">50K_<75K","msr_number":"9568247602"},{"store_code":"S1000","store_name":"Spencer's Kolkata-0","customer_name":"Customer 0044","city_name":"Chennai","cluster_name":"Bangalore-East","region_name":"East","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Mar-26","current_bill_value":0.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":200.0,"incremental_sales":0.0,"current_nob":3.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":800.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9757700215"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0045","city_name":"Mumbai","cluster_name":"Delhi-NCR","region_name":"South","format_type":"Daily","shopper_behaviour":"Not Shopped","enroll_month":"Feb-26","current_bill_value":0.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":200.0,"incremental_sales":0.0,"current_nob":7.0,"past_six_months_average_nob":0.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9995918024"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0046","city_name":"Chennai","cluster_name":"Hyderabad-West","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Feb-26","current_bill_value":22000.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":200.0,"incremental_sales":18500.0,"current_nob":5.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":2000.0,"bill_slab":"<=25K","msr_number":"9475978345"},{"store_code":"S1002","store_name":"Spencer's Delhi-2","customer_name":"Customer 0047","city_name":"Mumbai","cluster_name":"Mumbai-South","region_name":"East","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Dec-25","current_bill_value":0.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":50.0,"incremental_sales":0.0,"current_nob":3.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9522394240"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0048","city_name":"Bangalore","cluster_name":"Bangalore-East","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":22000.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":200.0,"incremental_sales":20200.0,"current_nob":2.0,"past_six_months_average_nob":2.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9856521517"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0049","city_name":"Bangalore","cluster_name":"Mumbai-South","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Jan-26","current_bill_value":1500.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":0.0,"incremental_sales":-16500.0,"current_nob":3.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":71.43,"bill_slab":"<=25K","msr_number":"9791764829"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0050","city_name":"Kolkata","cluster_name":"Kolkata-Central","region_name":"West","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":4500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":4500.0,"current_nob":7.0,"past_six_months_average_nob":9.0,"past_six_months_average_ams":0.0,"past_six_months_ams_slab":"1001 to 1500","current_ams_slab":"5001 to 7500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9666081727"},{"store_code":"S1001","store_name":"Spencer's Mumbai-1","customer_name":"Customer 0051","city_name":"Chennai","cluster_name":"Bangalore-East","region_name":"North","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":8000.0,"cashback_earned_current_month":240.0,"redemed_amount_current_month":200.0,"incremental_sales":4500.0,"current_nob":2.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9732730118"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0052","city_name":"Bangalore","cluster_name":"Delhi-NCR","region_name":"South","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Nov-25","current_bill_value":8000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":200.0,"incremental_sales":-1000.0,"current_nob":0.0,"past_six_months_average_nob":1.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":727.27,"bill_slab":"<=25K","msr_number":"9556404838"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0053","city_name":"Chennai","cluster_name":"Hyderabad-West","region_name":"West","format_type":"Daily","shopper_behaviour":"Shopped","enroll_month":"Mar-26","current_bill_value":22000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":18500.0,"current_nob":0.0,"past_six_months_average_nob":2.0,"past_six_months_average_ams":3500.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":2750.0,"bill_slab":"<=25K","msr_number":"9799608813"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0054","city_name":"Chennai","cluster_name":"Mumbai-South","region_name":"East","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Nov-25","current_bill_value":4500.0,"cashback_earned_current_month":450.0,"redemed_amount_current_month":50.0,"incremental_sales":-4500.0,"current_nob":3.0,"past_six_months_average_nob":8.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":750.0,"bill_slab":"<=25K","msr_number":"9314542951"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0055","city_name":"Chennai","cluster_name":"Mumbai-South","region_name":"North","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Apr-26","current_bill_value":22000.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":0.0,"incremental_sales":20200.0,"current_nob":0.0,"past_six_months_average_nob":9.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":1100.0,"bill_slab":"<=25K","msr_number":"9311081634"},{"store_code":"S1007","store_name":"Spencer's Banjara","customer_name":"Customer 0056","city_name":"Chennai","cluster_name":"Hyderabad-West","region_name":"South","format_type":"Hyper","shopper_behaviour":"Shopped","enroll_month":"Feb-26","current_bill_value":8000.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":-1000.0,"current_nob":3.0,"past_six_months_average_nob":8.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":1333.33,"bill_slab":"<=25K","msr_number":"9571773676"},{"store_code":"S1005","store_name":"Spencer's Chennai-5","customer_name":"Customer 0057","city_name":"Mumbai","cluster_name":"Bangalore-East","region_name":"South","format_type":"Daily","shopper_behaviour":"Not Shopped","enroll_month":"Nov-25","current_bill_value":0.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":5.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":9000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9826688444"},{"store_code":"S1004","store_name":"Spencer's Hyderabad-4","customer_name":"Customer 0058","city_name":"Kolkata","cluster_name":"Mumbai-South","region_name":"East","format_type":"Hyper","shopper_behaviour":"Not Shopped","enroll_month":"Mar-26","current_bill_value":0.0,"cashback_earned_current_month":100.0,"redemed_amount_current_month":0.0,"incremental_sales":0.0,"current_nob":1.0,"past_six_months_average_nob":4.0,"past_six_months_average_ams":1800.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"1001 to 1500","current_asp":0.0,"bill_slab":"<=25K","msr_number":"9409659842"},{"store_code":"S1003","store_name":"Spencer's Bangalore-3","customer_name":"Customer 0059","city_name":"Chennai","cluster_name":"Mumbai-South","region_name":"West","format_type":"Super","shopper_behaviour":"Shopped","enroll_month":"Dec-25","current_bill_value":1500.0,"cashback_earned_current_month":0.0,"redemed_amount_current_month":200.0,"incremental_sales":-16500.0,"current_nob":6.0,"past_six_months_average_nob":5.0,"past_six_months_average_ams":18000.0,"past_six_months_ams_slab":"5001 to 7500","current_ams_slab":"5001 to 7500","current_asp":65.22,"bill_slab":"<=25K","msr_number":"9586770972"}];
+const __EMBEDDED_REPORTING_MONTH__ = "Apr-26";
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let allData=[], filteredData=[], chartInstances={}, currentPage=1;
+let reportingMonth='';
+const PAGE_SIZE=50;
+const COLS=['store_name','customer_name','city_name','cluster_name','region_name','format_type','shopper_behaviour','customer_type','enroll_month','current_bill_value','cashback_earned_current_month','redemed_amount_current_month','incremental_sales','current_nob','past_six_months_average_nob'];
+
+// ═══════════════════════════════════════════════════════════════
+//  THEME — follows system preference, manual override available
+// ═══════════════════════════════════════════════════════════════
+let isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+let viewMode = 'auto'; // 'auto' | 'mobile' | 'tablet' | 'pc'
+let userThemeOverride = false;
+let CD, AX, AXM; // chart theme defaults (populated by buildThemeDefaults)
+
+// ─── Responsive view system ───
+const VIEW_CYCLE = ['auto','mobile','tablet','pc'];
+const VIEW_META = {
+  auto:   {icon:'🔄', label:'Auto View'},
+  mobile: {icon:'📱', label:'Mobile View'},
+  tablet: {icon:'📲', label:'Tablet View'},
+  pc:     {icon:'🖥️', label:'PC View'}
+};
+function detectScreenView(){
+  const w = window.innerWidth;
+  if(w < 768)   return 'mobile';
+  if(w <= 1024) return 'tablet';
+  return 'pc';
+}
+function applyViewMode(){
+  const effective = viewMode === 'auto' ? detectScreenView() : viewMode;
+  document.body.setAttribute('data-view', effective);
+  const btn = document.getElementById('view-toggle-btn');
+  if(btn){
+    const meta = VIEW_META[viewMode];
+    const icon = btn.querySelector('.btn-icon');
+    const label = document.getElementById('view-toggle-label');
+    if(icon)  icon.textContent  = meta.icon;
+    if(label) label.textContent = meta.label;
+    btn.classList.toggle('active', viewMode !== 'auto');
+    btn.title = viewMode === 'auto' ? `Auto — currently ${effective.toUpperCase()}` : `Forced ${viewMode.toUpperCase()} view`;
+  }
+  // Resize any active charts so they re-fit the new layout
+  Object.values(chartInstances).forEach(c=>{try{c.resize();}catch(_){}});
+}
+function toggleViewMode(){
+  const i = VIEW_CYCLE.indexOf(viewMode);
+  viewMode = VIEW_CYCLE[(i+1) % VIEW_CYCLE.length];
+  applyViewMode();
+}
+// Re-evaluate on window resize (only matters in auto mode)
+window.addEventListener('resize', ()=>{ if(viewMode === 'auto') applyViewMode(); });
+
+function applyTheme(){
+  document.body.classList.toggle('light-mode', !isDark);
+  const icon = document.getElementById('theme-icon');
+  const lbl  = document.getElementById('theme-label');
+  const btn  = document.getElementById('theme-toggle-btn');
+  if(icon) icon.textContent = isDark ? '☀️' : '🌙';
+  if(lbl)  lbl.textContent  = isDark ? 'Light Mode' : 'Dark Mode';
+  if(btn)  btn.classList.toggle('active', !isDark);
+  buildThemeDefaults();
+  if(filteredData.length) buildDashboard();
+}
+
+// Follow system theme changes (unless user manually overrode)
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  if(!userThemeOverride){ isDark = e.matches; applyTheme(); }
+});
+
+// Apply initial theme
+applyTheme();
+
+function toggleTheme(){
+  userThemeOverride = true;
+  isDark = !isDark;
+  applyTheme();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHART THEME DEFAULTS
+// ═══════════════════════════════════════════════════════════════
+function buildThemeDefaults(){
+  const light = !isDark;
+  const muted   = light ? '#5a6380' : '#7a8398';
+  const textClr = light ? '#1a2035' : '#e8eaf0';
+  const bgClr   = light ? '#ffffff' : '#182035';
+  const gridClr = light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,.05)';
+  const borderClr = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,.1)';
+  CD = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{labels:{color:muted,font:{family:'DM Sans',size:11},boxWidth:10,padding:10}},
+      tooltip:{backgroundColor:bgClr,borderColor:borderClr,borderWidth:1,titleColor:textClr,bodyColor:muted,padding:10,cornerRadius:8,titleFont:{family:'Syne',weight:'bold'}}
+    }
+  };
+  AX = (yFmt)=>({
+    x:{grid:{color:gridClr},ticks:{color:muted,font:{family:'DM Sans',size:10}}},
+    y:{grid:{color:gridClr},ticks:{color:muted,font:{family:'DM Sans',size:10},callback:yFmt||undefined}}
+  });
+  AXM = (yFmt)=>({
+    x:{grid:{color:gridClr},ticks:{color:muted,font:{family:'DM Sans',size:10},maxRotation:42}},
+    y:{grid:{color:gridClr},ticks:{color:muted,font:{family:'DM Sans',size:10},callback:yFmt||undefined}}
+  });
+}
+buildThemeDefaults();
+const mc=()=>(!isDark?'#5a6380':'#7a8398');
+
+// ═══════════════════════════════════════════════════════════════
+//  MONTH UTILITIES
+// ═══════════════════════════════════════════════════════════════
+const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parseMonthKey(str){
+  if(!str)return null;
+  const p=str.split('-');if(p.length!==2)return null;
+  const mi=MONTH_NAMES.indexOf(p[0]);if(mi<0)return null;
+  const yr=parseInt(p[1]);
+  const fullYr=yr<100?(yr>=0&&yr<=50?2000+yr:1900+yr):yr;
+  return{m:mi,y:fullYr};
+}
+function monthToNum(str){ const k=parseMonthKey(str); return k?k.y*12+k.m:0; }
+function subMonths(str,n){
+  const k=parseMonthKey(str);if(!k)return'';
+  let m=k.m-n,y=k.y;
+  while(m<0){m+=12;y--;}
+  return MONTH_NAMES[m]+'-'+(String(y).slice(-2));
+}
+function detectReportingMonth(data){
+  let mx=0,mxStr='';
+  data.forEach(r=>{ const n=monthToNum(r.enroll_month); if(n>mx){mx=n;mxStr=r.enroll_month;} });
+  return mxStr;
+}
+
+// (Upload pipeline removed — data is injected by Python host)
+
+// ═══════════════════════════════════════════════════════════════
+//  FILTERS
+// ═══════════════════════════════════════════════════════════════
+function populateFilters(){
+  const u=f=>[...new Set(allData.map(r=>r[f]).filter(Boolean))].sort();
+  ['filter-region','filter-city','filter-cluster','filter-store','filter-format','filter-shopper','filter-custtype','filter-month']
+    .forEach((id,i)=>populate(id,u(['region_name','city_name','cluster_name','store_name','format_type','shopper_behaviour','customer_type','enroll_month'][i])));
+}
+function populate(id,vals){const s=document.getElementById(id);vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;s.appendChild(o);});}
+function applyFilters(){
+  const s=document.getElementById('search-input').value.toLowerCase();
+  const g=id=>document.getElementById(id).value;
+  filteredData=allData.filter(r=>{
+    if(g('filter-region')&&r.region_name!==g('filter-region'))return false;
+    if(g('filter-city')&&r.city_name!==g('filter-city'))return false;
+    if(g('filter-cluster')&&r.cluster_name!==g('filter-cluster'))return false;
+    if(g('filter-store')&&r.store_name!==g('filter-store'))return false;
+    if(g('filter-format')&&r.format_type!==g('filter-format'))return false;
+    if(g('filter-shopper')&&r.shopper_behaviour!==g('filter-shopper'))return false;
+    if(g('filter-custtype')&&r.customer_type!==g('filter-custtype'))return false;
+    if(g('filter-month')&&r.enroll_month!==g('filter-month'))return false;
+    if(s&&!`${r.customer_name||''} ${r.store_name||''} ${r.city_name||''} ${r.cluster_name||''}`.toLowerCase().includes(s))return false;
+    return true;
+  });
+  currentPage=1;buildDashboard();
+  document.getElementById('row-count-badge').textContent=filteredData.length.toLocaleString()+' records';
+}
+function clearFilters(){
+  ['filter-region','filter-city','filter-cluster','filter-store','filter-format','filter-shopper','filter-custtype','filter-month'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('search-input').value='';applyFilters();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+const sum=(a,k)=>a.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
+const avg=(a,k)=>a.length?sum(a,k)/a.length:0;
+const cnt=(a,k,v)=>a.filter(r=>r[k]===v).length;
+const gCnt=(a,k)=>a.reduce((o,r)=>{const g=r[k]||'Unknown';o[g]=(o[g]||0)+1;return o;},{});
+const gSum=(a,k,v)=>a.reduce((o,r)=>{const g=r[k]||'Unknown';o[g]=(o[g]||0)+(parseFloat(r[v])||0);return o;},{});
+const gAvg=(a,k,v)=>{const s=gSum(a,k,v),c=gCnt(a,k);return Object.fromEntries(Object.keys(s).map(g=>[g,c[g]?s[g]/c[g]:0]));};
+const fmt=n=>{if(isNaN(n)||n==null)return'—';const abs=Math.abs(n),sg=n<0?'-':'';if(abs>=1e7)return sg+'₹'+(abs/1e7).toFixed(1)+'Cr';if(abs>=1e5)return sg+'₹'+(abs/1e5).toFixed(1)+'L';if(abs>=1e3)return sg+'₹'+(abs/1e3).toFixed(1)+'K';return sg+'₹'+abs.toFixed(0);};
+const fmtN=n=>{if(isNaN(n)||n==null)return'—';const abs=Math.abs(n),sg=n<0?'-':'';if(abs>=1e7)return sg+(abs/1e7).toFixed(1)+'Cr';if(abs>=1e5)return sg+(abs/1e5).toFixed(1)+'L';if(abs>=1e3)return sg+(abs/1e3).toFixed(1)+'K';return sg+abs.toFixed(1);};
+const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'0%';
+const trunc=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':s;
+const C=['#f5a623','#4fc3f7','#66bb6a','#e85d37','#ab47bc','#26c6da','#ff7043','#ffca28','#8bc34a','#5c6bc0','#ec407a','#29b6f6','#9ccc65','#ffa726','#7e57c2'];
+function mkC(id,cfg){if(chartInstances[id]){chartInstances[id].destroy();delete chartInstances[id];}const c=document.getElementById(id);if(!c)return;chartInstances[id]=new Chart(c,cfg);}
+function kpi(l,v,s,cls,dt,dp){const d=dt?`<span class="kpi-delta ${dp?'pos':'neg'}">${dp?'▲':'▼'} ${dt}</span>`:'';return`<div class="kpi-card ${cls}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div><div class="kpi-sub">${s}</div>${d}</div>`;}
+function ins(icon,bg,title,body){return`<div class="insight-card"><div class="insight-icon" style="background:${bg}">${icon}</div><div class="insight-body"><h4>${title}</h4><p>${body}</p></div></div>`;}
+function rrByGroup(d,key){
+  const ex=d.filter(r=>r.customer_type==='Existing Customer');
+  const groups={};
+  ex.forEach(r=>{const g=r[key]||'Unknown';if(!groups[g])groups[g]={t:0,r:0};groups[g].t++;if(r.shopper_behaviour==='Shopped')groups[g].r++;});
+  return Object.entries(groups).map(([g,v])=>({group:g,total:v.t,returned:v.r,rate:v.t?v.r/v.t*100:0})).sort((a,b)=>b.rate-a.rate);
+}
+function renderLB(elId,items,nameFn,valFn,metaFn,maxVal,bad){
+  document.getElementById(elId).innerHTML=items.map((it,i)=>`<div class="leaderboard-item">
+    <div class="rank-num ${i<3&&!bad?'top':''}">${i+1}</div>
+    <div class="lb-info"><div class="lb-name">${nameFn(it)}</div><div class="lb-meta">${metaFn(it)}</div></div>
+    <div class="lb-bar-wrap"><div class="lb-bar${bad?' bad':''}" style="width:${maxVal>0?(parseFloat(valFn(it))/maxVal*100)||0:0}%"></div></div>
+    <div class="lb-value">${valFn(it)}</div>
+  </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BUILD DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function buildDashboard(){
+  const d=filteredData;
+  buildOverview(d);buildReturnRate(d);buildCustomers(d);buildStores(d);buildCashback(d);buildGeography(d);buildLostSales(d);buildExplorer(d);
+}
+
+// ─── OVERVIEW ───
+function buildOverview(d){
+  const rev=sum(d,'current_bill_value'),sh=d.filter(r=>r.shopper_behaviour==='Shopped'),conv=d.length?sh.length/d.length*100:0;
+  const ab=avg(d.filter(r=>parseFloat(r.current_bill_value)>0),'current_bill_value');
+  const cb=sum(d,'cashback_earned_current_month'),red=sum(d,'redemed_amount_current_month'),stores=new Set(d.map(r=>r.store_code)).size;
+  document.getElementById('overview-kpis').innerHTML=
+    kpi('Total Revenue',fmt(rev),'Current month billing','amber')+kpi('Total Customers',d.length.toLocaleString(),'In filtered view','blue')+
+    kpi('Customer Shopped',conv.toFixed(1)+'%',sh.length.toLocaleString()+' shopped','green')+kpi('Avg AMS Value',fmt(ab),'Per transacting customer','amber')+
+    kpi('Cashback Earned',fmt(cb),'Total this month','red')+kpi('Cashback Redeemed',fmt(red),cb>0?pct(red,cb)+' utilization':'—','purple')+
+    kpi('Active Stores',stores,'Unique store codes','blue')+kpi('Not Shopped',(d.length-sh.length).toLocaleString(),'','red');
+  const tReg=Object.entries(gSum(d,'region_name','current_bill_value')).sort((a,b)=>b[1]-a[1])[0];
+  const tCity=Object.entries(gSum(d,'city_name','current_bill_value')).sort((a,b)=>b[1]-a[1])[0];
+  const exC=d.filter(r=>r.customer_type==='Existing Customer');const newC=d.filter(r=>r.customer_type==='New Customer');
+  const rr=cb>0?(red/cb*100).toFixed(1):0;
+  const tStore=Object.entries(gSum(d,'store_name','current_bill_value')).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('overview-insights').innerHTML=
+    ins('📍','rgba(245,166,35,.15)','Top Revenue Region',`<strong>${tReg?tReg[0]:'–'}</strong> leads with ${tReg?fmt(tReg[1]):'–'} in billing.`)+
+    ins('🏙️','rgba(79,195,247,.15)','Best City',`<strong>${tCity?tCity[0]:'–'}</strong> — ${tCity?fmt(tCity[1]):'–'} revenue.`)+
+    ins('💰','rgba(171,71,188,.15)','Cashback Utilization',`Redemption <strong>${rr}%</strong>. ${parseFloat(rr)<30?'Push activation campaigns.':'Healthy utilization.'}`)+
+    ins('🏪','rgba(232,93,55,.15)','Top Store',`<strong>${tStore?trunc(tStore[0],20):'–'}</strong> — ${tStore?fmt(tStore[1]):'–'}.`)+
+    ins('📊','rgba(38,198,218,.15)','Coverage',`<strong>${new Set(d.map(r=>r.region_name)).size} regions</strong>, ${new Set(d.map(r=>r.city_name)).size} cities, ${stores} stores.`);
+  const beh=gCnt(d,'shopper_behaviour');
+  mkC('chart-shopper',{type:'doughnut',data:{labels:Object.keys(beh),datasets:[{data:Object.values(beh),backgroundColor:[C[2],C[3]],borderWidth:0,hoverOffset:5}]},options:{...CD,cutout:'65%'}});
+  const cu=gCnt(d,'customer_type');
+  mkC('chart-custtype',{type:'doughnut',data:{labels:Object.keys(cu),datasets:[{data:Object.values(cu),backgroundColor:[C[0],C[1]],borderWidth:0,hoverOffset:5}]},options:{...CD,cutout:'65%'}});
+  const sl=gCnt(d,'bill_slab');
+  mkC('chart-billslab',{type:'bar',data:{labels:Object.keys(sl),datasets:[{label:'Count',data:Object.values(sl),backgroundColor:C[0],borderRadius:4}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+  const fm=gCnt(d,'format_type');
+  mkC('chart-format',{type:'pie',data:{labels:Object.keys(fm),datasets:[{data:Object.values(fm),backgroundColor:C.slice(0,Object.keys(fm).length),borderWidth:0}]},options:{...CD}});
+  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const et=Object.entries(gCnt(d,'enroll_month')).sort((a,b)=>{const p=s=>{const[m,y]=s.split('-');return parseInt(y)*12+mo.indexOf(m);};return p(a[0])-p(b[0]);});
+  mkC('chart-enroll-trend',{type:'line',data:{labels:et.map(e=>e[0]),datasets:[{label:'Enrollments',data:et.map(e=>e[1]),borderColor:C[0],backgroundColor:'rgba(245,166,35,.08)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:C[0]}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+}
+
+// ─── RETURN RATE ───
+function buildReturnRate(d){
+  const rmNum=monthToNum(reportingMonth);
+  // Existing Customer = enrolled in any month BEFORE the reporting month.
+  // Return Rate = (Existing Customers who shopped in current month) / (Total Existing Customers)
+  const rrNote=reportingMonth
+    ? `Return Rate definition: customers enrolled in any month BEFORE ${reportingMonth} who shopped in ${reportingMonth} ÷ total such customers`
+    : 'No reporting month detected';
+  const noteEl=document.getElementById('rr-window-note');if(noteEl)noteEl.textContent=rrNote;
+  const rrEligible = rmNum>0
+    ? d.filter(r=>{ const n=monthToNum(r.enroll_month); return n>0 && n<rmNum; })
+    : d.filter(r=>r.customer_type==='Existing Customer');
+  const ret=rrEligible.filter(r=>r.shopper_behaviour==='Shopped');
+  const rrOv=rrEligible.length?ret.length/rrEligible.length*100:0;
+  function rrByGroupFiltered(data,key){
+    const groups={};
+    rrEligible.forEach(r=>{const g=r[key]||'Unknown';if(!groups[g])groups[g]={t:0,r:0};groups[g].t++;if(r.shopper_behaviour==='Shopped')groups[g].r++;});
+    return Object.entries(groups).map(([g,v])=>({group:g,total:v.t,returned:v.r,rate:v.t?v.r/v.t*100:0})).sort((a,b)=>b.rate-a.rate);
+  }
+  const rrByS=rrByGroupFiltered(d,'store_name').filter(s=>s.total>=3);
+  const avgRRS=rrByS.length?rrByS.reduce((a,s)=>a+s.rate,0)/rrByS.length:0;
+  document.getElementById('rr-kpis').innerHTML=
+    kpi('Eligible Customers',rrEligible.length.toLocaleString(),'Enrolled before reporting month','amber')+
+    kpi('Returned (Shopped)',ret.length.toLocaleString(),'Active this month','green')+
+    kpi('Overall Return Rate',rrOv.toFixed(1)+'%','Eligible who came back',rrOv>=40?'green':'red')+
+    kpi('Not Returned',(rrEligible.length-ret.length).toLocaleString(),'At-risk / lapsed','red')+
+    kpi('Avg Store Return Rate',avgRRS.toFixed(1)+'%','Mean across stores','purple')+
+    kpi('Stores Tracked',rrByS.length,'Min 3 eligible customers','blue');
+  const SLABS=['0 to 500','501 to 1000','1001 to 1500','1501 to 2000','2001 to 2500','2501 to 3000','3001 to 3300','3301 to 4000','4001 to 5000','5001 to 7500','7501 to 10000','10001 to 12500','12501 to 15000','15000 & Above'];
+  const pCnt=gCnt(d,'past_six_months_ams_slab'),cCnt=gCnt(d,'current_ams_slab');
+  const labs=SLABS.filter(s=>pCnt[s]||cCnt[s]);
+  mkC('chart-ams-transition',{type:'bar',data:{labels:labs,datasets:[{label:'Past 6M Avg Slab',data:labs.map(s=>pCnt[s]||0),backgroundColor:'rgba(79,195,247,0.75)',borderRadius:4},{label:'Current Month Slab',data:labs.map(s=>cCnt[s]||0),backgroundColor:'rgba(245,166,35,0.75)',borderRadius:4}]},options:{...CD,scales:{x:{...AXM().x},y:{...AX().y}}}});
+  buildAmsTransitionMatrix(d, SLABS);
+  const rrReg=rrByGroupFiltered(d,'region_name');
+  mkC('chart-rr-region',{type:'bar',data:{labels:rrReg.map(r=>r.group),datasets:[{label:'Return Rate %',data:rrReg.map(r=>+r.rate.toFixed(1)),backgroundColor:rrReg.map(r=>r.rate>=50?'rgba(76,175,80,.8)':'rgba(239,83,80,.8)'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,max:100,ticks:{callback:v=>v+'%',color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const rrCl=rrByGroupFiltered(d,'cluster_name');
+  mkC('chart-rr-cluster',{type:'bar',data:{labels:rrCl.map(r=>r.group),datasets:[{label:'Return Rate %',data:rrCl.map(r=>+r.rate.toFixed(1)),backgroundColor:rrCl.map(r=>r.rate>=50?'rgba(76,175,80,.8)':'rgba(245,166,35,.8)'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:{...AX().y,max:100,ticks:{callback:v=>v+'%',color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const top10r=[...rrByS].sort((a,b)=>b.rate-a.rate).slice(0,10);
+  const bot10r=[...rrByS].sort((a,b)=>a.rate-b.rate).slice(0,10);
+  renderLB('rr-top10',top10r,s=>trunc(s.group,24),s=>s.rate.toFixed(1)+'%',s=>`${s.returned}/${s.total} customers`,100,false);
+  renderLB('rr-bot10',bot10r,s=>trunc(s.group,24),s=>s.rate.toFixed(1)+'%',s=>`${s.returned}/${s.total} customers`,100,true);
+  const enr=Object.entries(gCnt(d,'store_name')).map(([g,c])=>({group:g,cnt:c}));
+  const top10e=[...enr].sort((a,b)=>b.cnt-a.cnt).slice(0,10);
+  const bot10e=[...enr].sort((a,b)=>a.cnt-b.cnt).slice(0,10);
+  const maxE=Math.max(...top10e.map(s=>s.cnt));
+  renderLB('enroll-top10',top10e,s=>trunc(s.group,24),s=>s.cnt.toLocaleString(),s=>'customers',maxE,false);
+  renderLB('enroll-bot10',bot10e,s=>trunc(s.group,24),s=>s.cnt.toLocaleString(),s=>'customers',maxE,true);
+}
+
+// ─── AMS TRANSITION MATRIX (waterfall) ───
+function buildAmsTransitionMatrix(d, SLABS){
+  // Count (past_slab, current_slab) pairs
+  const counts = {};
+  let stayed=0, upgraded=0, downgraded=0;
+  d.forEach(r => {
+    const p = r.past_six_months_ams_slab;
+    const c = r.current_ams_slab;
+    if (!p || !c) return;
+    const pi = SLABS.indexOf(p);
+    const ci = SLABS.indexOf(c);
+    if (pi < 0 || ci < 0) return;
+    const key = pi + '|' + ci;
+    counts[key] = (counts[key] || 0) + 1;
+    if (pi === ci) stayed++;
+    else if (ci > pi) upgraded++;
+    else downgraded++;
+  });
+
+  // Update KPI strip
+  const total = stayed + upgraded + downgraded;
+  const pct = (n) => total ? ((n/total)*100).toFixed(1)+'%' : '0%';
+  const kEl = document.getElementById('ams-transition-kpis');
+  if (kEl) {
+    kEl.innerHTML =
+      kpi('Upgraded', upgraded.toLocaleString(), pct(upgraded)+' of base','green') +
+      kpi('Stayed Same', stayed.toLocaleString(), pct(stayed)+' of base','blue') +
+      kpi('Downgraded', downgraded.toLocaleString(), pct(downgraded)+' of base','amber') +
+      kpi('Total Tracked', total.toLocaleString(), 'Customers with both past & current slab','purple');
+  }
+
+  // Determine which slabs actually appear (rows or cols)
+  const used = new Set();
+  Object.keys(counts).forEach(k => {
+    const [pi, ci] = k.split('|').map(Number);
+    used.add(pi); used.add(ci);
+  });
+  const visible = SLABS.map((_, i) => i).filter(i => used.has(i));
+  if (!visible.length) {
+    document.getElementById('ams-transition-matrix').innerHTML =
+      '<div style="padding:18px;color:var(--muted);font-size:12px;">No customers have both a past and current AMS slab in the current filter.</div>';
+    return;
+  }
+
+  // Build the HTML table
+  const rowTotals = {}, colTotals = {};
+  let grand = 0;
+  visible.forEach(pi => visible.forEach(ci => {
+    const v = counts[pi+'|'+ci] || 0;
+    rowTotals[pi] = (rowTotals[pi] || 0) + v;
+    colTotals[ci] = (colTotals[ci] || 0) + v;
+    grand += v;
+  }));
+
+  const sLabel = i => SLABS[i].replace(' to ', '–').replace(' & Above', '+');
+
+  let html = '<table class="ams-tx-table"><thead><tr>';
+  html += '<th class="corner">Past 6M ↓ / Current →</th>';
+  visible.forEach(ci => { html += `<th>${sLabel(ci)}</th>`; });
+  html += '<th class="tot">Grand Total</th></tr></thead><tbody>';
+
+  visible.forEach(pi => {
+    html += `<tr><th class="row-h">${sLabel(pi)}</th>`;
+    visible.forEach(ci => {
+      const v = counts[pi+'|'+ci] || 0;
+      let cls;
+      if (v === 0) cls = 'empty';
+      else if (pi === ci) cls = 'diag';
+      else if (ci > pi) cls = 'up';
+      else cls = 'down';
+      html += `<td class="${cls}">${v ? v.toLocaleString() : '—'}</td>`;
+    });
+    html += `<td class="tot">${(rowTotals[pi]||0).toLocaleString()}</td></tr>`;
+  });
+
+  html += '<tr><th class="row-h tot">Grand Total</th>';
+  visible.forEach(ci => { html += `<td class="tot">${(colTotals[ci]||0).toLocaleString()}</td>`; });
+  html += `<td class="tot">${grand.toLocaleString()}</td></tr>`;
+  html += '</tbody></table>';
+
+  document.getElementById('ams-transition-matrix').innerHTML = html;
+}
+
+// ─── CUSTOMERS ───
+function buildCustomers(d){
+  const sh=d.filter(r=>r.shopper_behaviour==='Shopped');
+  const nw=d.filter(r=>r.customer_type==='New Customer');
+  const ex=d.filter(r=>r.customer_type==='Existing Customer');
+  const tCurrBill=sum(sh,'current_bill_value');const tPastAMS=sum(sh,'past_six_months_average_ams');const tInc=tCurrBill-tPastAMS;
+  const tCurrNOB=sum(sh,'current_nob');const tPastNOB=sum(sh,'past_six_months_average_nob');const tIncNOB=tCurrNOB-tPastNOB;
+  const aNOB=sh.length?tCurrNOB/sh.length:0;const aASP=avg(sh,'current_asp');
+  document.getElementById('customer-kpis').innerHTML=
+    kpi('Shopped Customers',sh.length.toLocaleString(),'Transacted this month','green')+
+    kpi('Incremental Sales',fmt(tInc),'Current − 6M avg baseline',tInc>=0?'green':'red')+
+    kpi('Total Incr. NOB',tIncNOB.toFixed(0),'Current NOB − Past Avg NOB',tIncNOB>=0?'green':'red')+
+    kpi('Avg NOB / Shopper',aNOB.toFixed(2),'Bills per customer','amber')+
+    kpi('Avg ASP',fmt(aASP),'Avg selling price','blue')+
+    kpi('New Customers',nw.length.toLocaleString(),'First-time buyers','blue')+
+    kpi('Existing Customers',ex.length.toLocaleString(),'Repeat members','purple')+
+    kpi('Shopped Revenue',fmt(tCurrBill),'Revenue from shoppers','amber');
+  const iR=Object.entries(gSum(d,'region_name','incremental_sales')).sort((a,b)=>b[1]-a[1]);
+  mkC('chart-inc-region',{type:'bar',data:{labels:iR.map(e=>e[0]),datasets:[{label:'Incremental Sales',data:iR.map(e=>e[1]),backgroundColor:iR.map(e=>e[1]>=0?'rgba(76,175,80,.8)':'rgba(239,83,80,.8)'),borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const iCl=Object.entries(gSum(d,'cluster_name','incremental_sales')).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mkC('chart-inc-cluster',{type:'bar',data:{labels:iCl.map(e=>e[0]),datasets:[{label:'Incremental Sales',data:iCl.map(e=>e[1]),backgroundColor:iCl.map(e=>e[1]>=0?'rgba(76,175,80,.75)':'rgba(239,83,80,.75)'),borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const iS15=Object.entries(gSum(d,'store_name','incremental_sales')).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  mkC('chart-inc-store',{type:'bar',data:{labels:iS15.map(e=>trunc(e[0],22)),datasets:[{label:'Incremental Sales',data:iS15.map(e=>e[1]),backgroundColor:iS15.map(e=>e[1]>=0?'rgba(76,175,80,.75)':'rgba(239,83,80,.75)'),borderRadius:4}]},options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},scales:{x:{...AX().x,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}},y:AX().y}}});
+  const shoped=d.filter(r=>r.shopper_behaviour==='Shopped');
+  const nobByR=Object.entries(gSum(shoped,'region_name','incremental_nob')||{});
+  const nobReg=Object.entries(gSum(shoped,'region_name','current_nob')).map(([g,cv])=>{const pv=gSum(shoped,'region_name','past_six_months_average_nob')[g]||0;return[g,cv-pv];}).sort((a,b)=>b[1]-a[1]);
+  mkC('chart-nob-region',{type:'bar',data:{labels:nobReg.map(e=>e[0]),datasets:[{label:'Incr. NOB',data:nobReg.map(e=>+e[1].toFixed(2)),backgroundColor:nobReg.map(e=>e[1]>=0?'rgba(76,175,80,.8)':'rgba(239,83,80,.8)'),borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+  const nobCl=Object.entries(gSum(shoped,'cluster_name','current_nob')).map(([g,cv])=>{const pv=gSum(shoped,'cluster_name','past_six_months_average_nob')[g]||0;return[g,cv-pv];}).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mkC('chart-nob-cluster',{type:'bar',data:{labels:nobCl.map(e=>e[0]),datasets:[{label:'Incr. NOB',data:nobCl.map(e=>+e[1].toFixed(2)),backgroundColor:nobCl.map(e=>e[1]>=0?'rgba(79,195,247,.75)':'rgba(239,83,80,.75)'),borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:AX().y}}});
+  const nobSt=Object.entries(gSum(shoped,'store_name','current_nob')).map(([g,cv])=>{const pv=gSum(shoped,'store_name','past_six_months_average_nob')[g]||0;return[g,cv-pv];}).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  mkC('chart-nob-store',{type:'bar',data:{labels:nobSt.map(e=>trunc(e[0],22)),datasets:[{label:'Incr. NOB',data:nobSt.map(e=>+e[1].toFixed(2)),backgroundColor:nobSt.map(e=>e[1]>=0?'rgba(76,175,80,.7)':'rgba(239,83,80,.7)'),borderRadius:4}]},options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+  const avgNew=avg(nw.filter(r=>parseFloat(r.current_bill_value)>0),'current_bill_value');const avgEx=avg(ex.filter(r=>parseFloat(r.current_bill_value)>0),'current_bill_value');
+  mkC('chart-avg-spend',{type:'bar',data:{labels:['New Customer','Existing Customer'],datasets:[{label:'Avg Bill Value',data:[+avgNew.toFixed(0),+avgEx.toFixed(0)],backgroundColor:[C[1]+'cc',C[0]+'cc'],borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const as=gCnt(d,'current_ams_slab');mkC('chart-ams-slab',{type:'bar',data:{labels:Object.keys(as),datasets:[{label:'Customers',data:Object.values(as),backgroundColor:C[0]+'bb',borderRadius:4}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:AX().y}}});
+}
+
+// ─── STORES ───
+function buildStores(d){
+  const stores=Object.entries(gSum(d,'store_name','current_bill_value')).sort((a,b)=>b[1]-a[1]);
+  const totalStores=new Set(d.map(r=>r.store_code)).size;
+  const topSt=stores[0];
+  const avgRev=stores.length?stores.reduce((a,e)=>a+e[1],0)/stores.length:0;
+  document.getElementById('store-kpis').innerHTML=
+    kpi('Total Stores',totalStores,'Unique store codes','blue')+
+    kpi('Top Store',trunc(topSt?topSt[0]:'—',16),topSt?fmt(topSt[1]):'—','amber')+
+    kpi('Avg Revenue/Store',fmt(avgRev),'Mean bill value','green')+
+    kpi('Total Formats',[...new Set(d.map(r=>r.format_type).filter(Boolean))].length,'Distinct store types','purple');
+  const top15=stores.slice(0,15);
+  mkC('chart-top-stores',{type:'bar',data:{labels:top15.map(e=>trunc(e[0],22)),datasets:[{label:'Revenue',data:top15.map(e=>e[1]),backgroundColor:top15.map((_,i)=>C[i%C.length]+'cc'),borderRadius:4}]},options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},scales:{x:{...AX().x,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}},y:AX().y}}});
+  const sf=gCnt(d,'format_type');mkC('chart-store-format',{type:'doughnut',data:{labels:Object.keys(sf),datasets:[{data:Object.values(sf),backgroundColor:C.slice(0,Object.keys(sf).length),borderWidth:0,hoverOffset:5}]},options:{...CD,cutout:'55%'}});
+  const bf=gAvg(d,'format_type','current_bill_value');mkC('chart-basket-format',{type:'bar',data:{labels:Object.keys(bf),datasets:[{label:'Avg Basket',data:Object.values(bf).map(v=>+v.toFixed(0)),backgroundColor:C.slice(0,Object.keys(bf).length).map(c=>c+'cc'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const maxSR=stores[0]?stores[0][1]:1;
+  document.getElementById('store-leaderboard').innerHTML=stores.slice(0,20).map((e,i)=>`<div class="leaderboard-item"><div class="rank-num ${i<3?'top':''}">${i+1}</div><div class="lb-info"><div class="lb-name">${e[0]}</div><div class="lb-meta">${cnt(d,'store_name',e[0])} customers</div></div><div class="lb-bar-wrap"><div class="lb-bar" style="width:${(e[1]/maxSR*100).toFixed(1)}%"></div></div><div class="lb-value">${fmt(e[1])}</div></div>`).join('');
+}
+
+// ─── CASHBACK ───
+function buildCashback(d){
+  const cb=sum(d,'cashback_earned_current_month'),red=sum(d,'redemed_amount_current_month');
+  const rr=cb>0?red/cb*100:0;const nr=cb-red;
+  document.getElementById('cashback-kpis').innerHTML=
+    kpi('Total Cashback Earned',fmt(cb),'This month','amber')+kpi('Total Redeemed',fmt(red),rr.toFixed(1)+'% utilization','green')+
+    kpi('Unredeemed Balance',fmt(nr),'Yet to be used','red')+kpi('Redemption Rate',rr.toFixed(1)+'%',rr>=30?'Healthy':'Needs activation',rr>=30?'green':'red');
+  mkC('chart-cb-comparison',{type:'bar',data:{labels:['Earned','Redeemed','Unredeemed'],datasets:[{label:'Amount',data:[cb,red,nr],backgroundColor:['rgba(245,166,35,.8)','rgba(76,175,80,.8)','rgba(239,83,80,.8)'],borderRadius:8}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const cbF=gSum(d,'format_type','cashback_earned_current_month');const redF=gSum(d,'format_type','redemed_amount_current_month');
+  const rrF=Object.keys(cbF).map(k=>({k,r:cbF[k]>0?redF[k]/cbF[k]*100:0}));
+  mkC('chart-redemption-rate',{type:'bar',data:{labels:rrF.map(e=>e.k),datasets:[{label:'Redemption %',data:rrF.map(e=>+e.r.toFixed(1)),backgroundColor:rrF.map(e=>e.r>=30?'rgba(76,175,80,.8)':'rgba(239,83,80,.8)'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,max:100,ticks:{callback:v=>v+'%',color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const cC=Object.entries(gSum(d,'city_name','cashback_earned_current_month')).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  mkC('chart-cb-city',{type:'bar',data:{labels:cC.map(e=>e[0]),datasets:[{label:'Cashback Earned',data:cC.map(e=>e[1]),backgroundColor:C.slice(0,cC.length).map(c=>c+'cc'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+}
+
+// ─── GEOGRAPHY ───
+function buildGeography(d){
+  const regions=new Set(d.map(r=>r.region_name)).size;const cities=new Set(d.map(r=>r.city_name)).size;
+  const clusters=new Set(d.map(r=>r.cluster_name)).size;const stores=new Set(d.map(r=>r.store_code)).size;
+  document.getElementById('geo-kpis').innerHTML=
+    kpi('Regions',regions,'Operational regions','blue')+kpi('Cities',cities,'Active cities','amber')+
+    kpi('Clusters',clusters,'Store clusters','green')+kpi('Stores',stores,'Unique stores','purple');
+  const rR=Object.entries(gSum(d,'region_name','current_bill_value')).sort((a,b)=>b[1]-a[1]);
+  mkC('chart-region-rev',{type:'bar',data:{labels:rR.map(e=>e[0]),datasets:[{label:'Revenue',data:rR.map(e=>e[1]),backgroundColor:C.slice(0,rR.length).map(c=>c+'cc'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const rC=Object.entries(gCnt(d,'region_name')).sort((a,b)=>b[1]-a[1]);
+  mkC('chart-region-cust',{type:'bar',data:{labels:rC.map(e=>e[0]),datasets:[{label:'Customers',data:rC.map(e=>e[1]),backgroundColor:C.slice(0,rC.length).map(c=>c+'aa'),borderRadius:6}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+  const cRv=Object.entries(gSum(d,'city_name','current_bill_value')).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  mkC('chart-city-rev',{type:'bar',data:{labels:cRv.map(e=>e[0]),datasets:[{label:'Revenue',data:cRv.map(e=>e[1]),backgroundColor:cRv.map((_,i)=>C[i%C.length]+'cc'),borderRadius:4}]},options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},scales:{x:{...AX().x,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}},y:AX().y}}});
+}
+
+// ─── LOST SALES ───
+function buildLostSales(d){
+  const ns=d.filter(r=>r.shopper_behaviour==='Not Shopped'&&(parseFloat(r.past_six_months_average_ams)||0)>0);
+  const tL=sum(ns,'past_six_months_average_ams');const tLN=sum(ns,'past_six_months_average_nob');
+  const aL=ns.length?tL/ns.length:0;const aLN=ns.length?tLN/ns.length:0;
+  document.getElementById('lost-kpis').innerHTML=
+    kpi('Lost Customers',ns.length.toLocaleString(),'Had past history, not shopped this month','red')+
+    kpi('Total Lost Sales',fmt(tL),'Σ Past 6M Avg AMS of lost customers','red')+
+    kpi('Avg Lost / Customer',fmt(aL),'Per lost customer','amber')+
+    kpi('Total Lost NOB',tLN.toFixed(0),'Σ Past 6M Avg NOB of lost customers','red')+
+    kpi('Avg Lost NOB / Cust',aLN.toFixed(2),'Expected visits missed','amber')+
+    kpi('Win-back Potential',fmt(tL),'If all returned this month','green');
+  const lR=Object.entries(gSum(ns,'region_name','past_six_months_average_ams')).sort((a,b)=>b[1]-a[1]);
+  mkC('chart-lost-region',{type:'bar',data:{labels:lR.map(e=>e[0]),datasets:[{label:'Lost Sales',data:lR.map(e=>e[1]),backgroundColor:'rgba(239,83,80,.75)',borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AX().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const lC=Object.entries(gSum(ns,'cluster_name','past_six_months_average_ams')).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mkC('chart-lost-cluster',{type:'bar',data:{labels:lC.map(e=>e[0]),datasets:[{label:'Lost Sales',data:lC.map(e=>e[1]),backgroundColor:'rgba(245,166,35,.75)',borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:{...AX().y,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}}}}});
+  const lS15=Object.entries(gSum(ns,'store_name','past_six_months_average_ams')).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  mkC('chart-lost-store',{type:'bar',data:{labels:lS15.map(e=>trunc(e[0],22)),datasets:[{label:'Lost Sales',data:lS15.map(e=>e[1]),backgroundColor:'rgba(239,83,80,.7)',borderRadius:4}]},options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},scales:{x:{...AX().x,ticks:{callback:v=>'₹'+fmtN(v),color:mc(),font:{family:'DM Sans',size:10}}},y:AX().y}}});
+  const lnR=Object.entries(gSum(ns,'region_name','past_six_months_average_nob')).sort((a,b)=>b[1]-a[1]);
+  mkC('chart-lostnob-region',{type:'bar',data:{labels:lnR.map(e=>e[0]),datasets:[{label:'Lost NOB',data:lnR.map(e=>+e[1].toFixed(2)),backgroundColor:'rgba(171,71,188,.75)',borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+  const lnC=Object.entries(gSum(ns,'cluster_name','past_six_months_average_nob')).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mkC('chart-lostnob-cluster',{type:'bar',data:{labels:lnC.map(e=>e[0]),datasets:[{label:'Lost NOB',data:lnC.map(e=>+e[1].toFixed(2)),backgroundColor:'rgba(79,195,247,.75)',borderRadius:5}]},options:{...CD,plugins:{...CD.plugins,legend:{display:false}},scales:{x:AXM().x,y:AX().y}}});
+  const lnS15=Object.entries(gSum(ns,'store_name','past_six_months_average_nob')).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  mkC('chart-lostnob-store',{type:'bar',data:{labels:lnS15.map(e=>trunc(e[0],22)),datasets:[{label:'Lost NOB',data:lnS15.map(e=>+e[1].toFixed(2)),backgroundColor:C[4]+'cc',borderRadius:4}]},options:{...CD,indexAxis:'y',plugins:{...CD.plugins,legend:{display:false}},scales:AX()}});
+}
+
+// ─── EXPLORER ───
+function buildExplorer(d){
+  document.getElementById('table-head').innerHTML='<tr>'+COLS.map(c=>`<th>${c.replace(/_/g,' ').toUpperCase()}</th>`).join('')+'</tr>';
+  const tot=d.length,tp=Math.max(1,Math.ceil(tot/PAGE_SIZE));
+  if(currentPage>tp)currentPage=tp;
+  const pg=d.slice((currentPage-1)*PAGE_SIZE,currentPage*PAGE_SIZE);
+  document.getElementById('table-body').innerHTML=pg.map(r=>'<tr>'+COLS.map(c=>{
+    const v=r[c];
+    if(c==='shopper_behaviour')return`<td><span class="tag ${v==='Shopped'?'tag-green':'tag-red'}">${v}</span></td>`;
+    if(c==='customer_type')return`<td><span class="tag ${v==='New Customer'?'tag-blue':'tag-amber'}">${v}</span></td>`;
+    if(c==='format_type')return`<td><span class="tag tag-muted">${v||'—'}</span></td>`;
+    if(['current_bill_value','cashback_earned_current_month','redemed_amount_current_month','incremental_sales'].includes(c)){const n=parseFloat(v)||0;return`<td style="color:${c==='incremental_sales'?(n>=0?'var(--green)':'var(--red)'):'var(--text)'}">${n!==0?fmt(n):'—'}</td>`;}
+    return`<td>${v??'—'}</td>`;
+  }).join('')+'</tr>').join('');
+  document.getElementById('page-info').textContent=`Page ${currentPage} of ${tp} (${tot.toLocaleString()} rows)`;
+  document.getElementById('prev-btn').disabled=currentPage<=1;
+  document.getElementById('next-btn').disabled=currentPage>=tp;
+}
+function changePage(dir){currentPage+=dir;buildExplorer(filteredData);}
+
+// ─── TABS ───
+function switchTab(id,btn){
+  // Force-hide every tab via inline style so no leaking display:block overrides CSS
+  document.querySelectorAll('.tab-content').forEach(e=>{
+    e.classList.remove('active');
+    e.style.setProperty('display','none','important');
+  });
+  document.querySelectorAll('.sidebar-tab, .mobile-tab-btn').forEach(e=>e.classList.remove('active'));
+  const tEl = document.getElementById('tab-'+id);
+  tEl.classList.add('active');
+  tEl.style.setProperty('display', id==='ai' ? 'flex' : 'block', 'important');
+  btn.classList.add('active');
+  document.querySelectorAll(`.sidebar-tab[data-tab="${id}"], .mobile-tab-btn[data-tab="${id}"]`).forEach(el=>el.classList.add('active'));
+  document.getElementById('main-content').scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── UTILS ──
+function show(id){document.getElementById(id).style.display='flex';}
+function hide(id){document.getElementById(id).style.display='none';}
+function resetDashboard(){ /* no-op: data lifecycle managed by Python host */ }
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT DROPDOWN — uses position:fixed to escape nav overflow
+// ═══════════════════════════════════════════════════════════════
+function positionExportDropdown(){
+  const btn = document.getElementById('export-btn');
+  const dd  = document.getElementById('export-dropdown');
+  if(!btn || !dd) return;
+  const r = btn.getBoundingClientRect();
+  const ddW = dd.offsetWidth || 200;
+  // Right-align under the button; clamp to viewport
+  let left = r.right - ddW;
+  if(left < 8) left = 8;
+  if(left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+  dd.style.left = left + 'px';
+  dd.style.top  = (r.bottom + 6) + 'px';
+}
+function toggleExport(e){
+  if(e) e.stopPropagation();
+  const dd = document.getElementById('export-dropdown');
+  const wasOpen = dd.classList.contains('open');
+  dd.classList.toggle('open');
+  if(!wasOpen) positionExportDropdown();
+}
+// Close on outside-click, reposition on resize/scroll
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('export-wrap');
+  const dd = document.getElementById('export-dropdown');
+  if(wrap && dd && dd.classList.contains('open') && !wrap.contains(e.target)){
+    dd.classList.remove('open');
+  }
+});
+window.addEventListener('resize', () => {
+  const dd = document.getElementById('export-dropdown');
+  if(dd && dd.classList.contains('open')) positionExportDropdown();
+});
+function closeExportDropdown(){
+  const dd = document.getElementById('export-dropdown');
+  if(dd) dd.classList.remove('open');
+}
+
+// ─── Library availability checks ───
+function requireLib(name, obj){
+  if(obj) return true;
+  const msg = `${name} library failed to load. Check your internet connection (CDN).`;
+  console.error('[Export] ' + msg);
+  showToast(msg, 'error');
+  return false;
+}
+
+// CSV Export
+function exportCSV(){
+  closeExportDropdown();
+  if(!filteredData.length){showToast('No data to export.','error');return;}
+  try{
+    const esc = v => {
+      if(v == null) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    };
+    const headers = COLS.join(',');
+    const rows = filteredData.map(r => COLS.map(c => esc(r[c])).join(','));
+    const csv = [headers, ...rows].join('\n');
+    // BOM for Excel UTF-8 compatibility
+    downloadBlob(new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'}), `rewards_data_${reportingMonth||'export'}.csv`);
+    showToast('CSV exported ✓','success');
+  }catch(e){
+    console.error('[exportCSV] failed:', e);
+    showToast('CSV export failed: ' + e.message, 'error');
+  }
+}
+
+// Excel Export
+function exportExcel(){
+  closeExportDropdown();
+  if(!filteredData.length){showToast('No data to export.','error');return;}
+  if(!requireLib('XLSX', window.XLSX)) return;
+  try{
+    const rows = filteredData.map(r => Object.fromEntries(COLS.map(c => [c.replace(/_/g,' ').toUpperCase(), r[c] ?? ''])));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Rewards Data');
+    XLSX.writeFile(wb, `rewards_data_${reportingMonth||'export'}.xlsx`);
+    showToast('Excel file exported ✓','success');
+  }catch(e){
+    console.error('[exportExcel] failed:', e);
+    showToast('Excel export failed: ' + e.message, 'error');
+  }
+}
+
+// JPEG Screenshot of active tab
+async function exportJPEG(){
+  closeExportDropdown();
+  if(!requireLib('html2canvas', window.html2canvas)) return;
+  const active = document.querySelector('.tab-content.active');
+  if(!active){showToast('No active tab.','error');return;}
+  showToast('Capturing screenshot…','info');
+  try{
+    const canvas = await html2canvas(active, {
+      scale: 2, useCORS: true,
+      backgroundColor: isDark ? '#0a0e1a' : '#f0f3fb',
+      logging: false
+    });
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.95));
+    if(!blob) throw new Error('Canvas produced no image blob');
+    downloadBlob(blob, `rewards_${reportingMonth||'export'}.jpg`);
+    showToast('JPEG saved ✓','success');
+  }catch(e){
+    console.error('[exportJPEG] failed:', e);
+    showToast('Screenshot failed: ' + e.message, 'error');
+  }
+}
+
+// PDF Export of active tab
+async function exportPDF(){
+  closeExportDropdown();
+  if(!requireLib('html2canvas', window.html2canvas)) return;
+  if(!requireLib('jsPDF', window.jspdf && window.jspdf.jsPDF)) return;
+  const active = document.querySelector('.tab-content.active');
+  if(!active){showToast('No active tab.','error');return;}
+  showToast('Generating PDF…','info');
+  try{
+    const canvas = await html2canvas(active, {
+      scale: 1.5, useCORS: true,
+      backgroundColor: isDark ? '#0a0e1a' : '#f0f3fb',
+      logging: false
+    });
+    const {jsPDF} = window.jspdf;
+    const orientation = canvas.width > canvas.height ? 'l' : 'p';
+    const pdf = new jsPDF({orientation, unit:'px', format:[canvas.width, canvas.height], hotfixes:['px_scaling']});
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, canvas.width, canvas.height);
+    pdf.save(`rewards_insights_${reportingMonth||'export'}.pdf`);
+    showToast('PDF saved ✓','success');
+  }catch(e){
+    console.error('[exportPDF] failed:', e);
+    showToast('PDF export failed: ' + e.message, 'error');
+  }
+}
+
+// PowerPoint Export — KPI summary deck
+async function exportPPTX(){
+  closeExportDropdown();
+  if(!filteredData.length){showToast('No data to export.','error');return;}
+  if(!requireLib('PptxGenJS', window.PptxGenJS)) return;
+  showToast('Building PPTX deck…','info');
+  try{
+    const d = filteredData;
+    const rev = sum(d,'current_bill_value');
+    const sh  = d.filter(r => r.shopper_behaviour === 'Shopped');
+    const cb  = sum(d,'cashback_earned_current_month');
+    const red = sum(d,'redemed_amount_current_month');
+    const rr   = cb > 0 ? (red/cb*100).toFixed(1) : 0;
+    const conv = d.length ? (sh.length/d.length*100).toFixed(1) : 0;
+    const ns = d.filter(r => r.shopper_behaviour === 'Not Shopped' && (parseFloat(r.past_six_months_average_ams)||0) > 0);
+    const tL = sum(ns,'past_six_months_average_ams');
+    const topStores = Object.entries(gSum(d,'store_name','current_bill_value')).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+    const prs = new PptxGenJS();
+    prs.layout = 'LAYOUT_WIDE';
+    const BG='#0a0e1a', ACCENT='#f5a623', WHITE='#e8eaf0', MUTED='#7a8398';
+
+    // Slide 1 — Title
+    let sl = prs.addSlide();
+    sl.background = {color: BG};
+    sl.addText("Spencer's Rewards Intelligence", {x:.4, y:.8, w:11, h:.8, fontSize:32, bold:true, color:ACCENT, fontFace:'Calibri'});
+    sl.addText(`Reporting Month: ${reportingMonth||'—'} · ${d.length.toLocaleString()} Records`, {x:.4, y:1.7, w:11, h:.4, fontSize:14, color:MUTED, fontFace:'Calibri'});
+    sl.addText("Generated by Spencer's Intelligence v3", {x:.4, y:6.5, w:11, h:.3, fontSize:10, color:MUTED, fontFace:'Calibri'});
+
+    // Slide 2 — KPIs
+    sl = prs.addSlide();
+    sl.background = {color: BG};
+    sl.addText('Key Performance Indicators', {x:.4, y:.2, w:12, h:.5, fontSize:20, bold:true, color:ACCENT, fontFace:'Calibri'});
+    const kpis = [
+      ['Total Revenue', fmt(rev)], ['Customers', d.length.toLocaleString()],
+      ['Shopped %', conv+'%'], ['Cashback Earned', fmt(cb)],
+      ['Redeemed', fmt(red)], ['Redemption Rate', rr+'%'],
+      ['Lost Sales', fmt(tL)], ['Active Stores', new Set(d.map(r=>r.store_code)).size]
+    ];
+    kpis.forEach(([l,v], i) => {
+      const col = i % 4, row = Math.floor(i/4);
+      const x = .3 + col*3, y = .9 + row*1.6;
+      sl.addShape(prs.ShapeType.rect, {x, y, w:2.8, h:1.3, fill:{color:'131929'}, line:{color:'333a52', width:1}});
+      sl.addText(l, {x, y:y+.1, w:2.8, h:.35, fontSize:9, color:MUTED, align:'center', fontFace:'Calibri'});
+      sl.addText(v, {x, y:y+.45, w:2.8, h:.6, fontSize:20, bold:true, color:WHITE, align:'center', fontFace:'Calibri'});
+    });
+
+    // Slide 3 — Top Stores
+    sl = prs.addSlide();
+    sl.background = {color: BG};
+    sl.addText('Top 5 Stores by Revenue', {x:.4, y:.2, w:12, h:.5, fontSize:20, bold:true, color:ACCENT, fontFace:'Calibri'});
+    topStores.forEach(([name, rv], i) => {
+      const y = .9 + i*.9;
+      sl.addShape(prs.ShapeType.rect, {x:.4, y, w:11, h:.75, fill:{color:'131929'}, line:{color:'333a52', width:1}});
+      sl.addText(`${i+1}. ${trunc(name,40)}`, {x:.6, y:y+.1, w:8, h:.5, fontSize:13, color:WHITE, fontFace:'Calibri'});
+      sl.addText(fmt(rv), {x:9.5, y:y+.1, w:1.8, h:.5, fontSize:14, bold:true, color:ACCENT, align:'right', fontFace:'Calibri'});
+    });
+
+    // Slide 4 — Lost Sales Summary
+    sl = prs.addSlide();
+    sl.background = {color: BG};
+    sl.addText('Lost Sales & Win-Back Opportunity', {x:.4, y:.2, w:12, h:.5, fontSize:20, bold:true, color:'ef5350', fontFace:'Calibri'});
+    sl.addText(`${ns.length.toLocaleString()} customers had purchase history but did not shop this month.`, {x:.4, y:.9, w:11, h:.45, fontSize:13, color:WHITE, fontFace:'Calibri'});
+    sl.addText(`Total Win-Back Potential: ${fmt(tL)}`, {x:.4, y:1.5, w:11, h:.5, fontSize:18, bold:true, color:ACCENT, fontFace:'Calibri'});
+
+    await prs.writeFile({fileName: `rewards_deck_${reportingMonth||'export'}.pptx`});
+    showToast('PPTX deck downloaded ✓','success');
+  }catch(e){
+    console.error('[exportPPTX] failed:', e);
+    showToast('PPTX export failed: ' + e.message, 'error');
+  }
+}
+
+function downloadBlob(blob, name){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+function showToast(msg,type='info'){
+  const t=document.createElement('div');t.className=`toast ${type}`;
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>{t.style.animation='toastOut .3s ease forwards';setTimeout(()=>t.remove(),300);},3000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INITIALIZE — set responsive view based on screen size
+// ═══════════════════════════════════════════════════════════════
+applyViewMode();
+
+// (IndexedDB persistence removed — data is injected by Python host)
+
+// Stub for any stragglers
+async function saveCSVToDB(){ return; }
+async function loadCSVFromDB(){ return null; }
+async function clearCSVFromDB(){ return; }
+
+// ═══════════════════════════════════════════════════════════════
+//  DASHBOARD REPORTING MONTH — live recalculation
+// ═══════════════════════════════════════════════════════════════
+function changeDashReportingMonth(val) {
+  if (!val || !allData.length) return;
+  reportingMonth = val;
+  const rmb = document.getElementById('report-month-badge');
+  if (rmb) { rmb.textContent = '📅 ' + reportingMonth; rmb.style.display = 'inline-flex'; }
+  // Re-derive customer_type for the new reporting month, then rebuild whole dash.
+  recomputeCustomerType();
+  filteredData = filteredData.map(r => allData.find(x => x.__rowid === r.__rowid) || r);
+  buildDashboard();
+  showToast('Dashboard updated for ' + reportingMonth, 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CUSTOMER TYPE (re)derivation for current reporting month
+//  Existing Customer = enrolled in any month BEFORE the reporting month
+//  New Customer      = enrolled in the reporting month
+// ═══════════════════════════════════════════════════════════════
+function recomputeCustomerType() {
+  const rmNum = monthToNum(reportingMonth);
+  if (!rmNum) return;
+  allData.forEach(r => {
+    const n = monthToNum(r.enroll_month);
+    r.customer_type = (n > 0 && n < rmNum) ? 'Existing Customer' : 'New Customer';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTO-INIT FROM EMBEDDED DATA
+// ═══════════════════════════════════════════════════════════════
+(function initFromEmbedded(){
+  if (!Array.isArray(__EMBEDDED_DATA__)) return;
+  // Stamp a stable row id so filter rebuilds can find the original rows after recompute.
+  __EMBEDDED_DATA__.forEach((r, i) => { r.__rowid = i; });
+  allData = __EMBEDDED_DATA__.filter(r => r.store_code);
+  reportingMonth = __EMBEDDED_REPORTING_MONTH__ || detectReportingMonth(allData);
+  recomputeCustomerType();
+  filteredData = [...allData];
+
+  // Sync header reporting month select
+  const dashRm = document.getElementById('dash-rm');
+  if (dashRm) dashRm.value = reportingMonth;
+
+  populateFilters();
+  buildDashboard();
+
+  // Show dashboard immediately (no upload screen anymore)
+  const ds = document.getElementById('dashboard-screen');
+  if (ds) ds.style.display = 'flex';
+  document.body.style.background = 'var(--bg)';
+
+  const rcb = document.getElementById('row-count-badge');
+  if (rcb) rcb.textContent = allData.length.toLocaleString() + ' records';
+  const rmb = document.getElementById('report-month-badge');
+  if (rmb) { rmb.textContent = '📅 ' + reportingMonth; rmb.style.display = 'inline-flex'; }
+})();
+
+</script>
+
+</body>
+</html>
