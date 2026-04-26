@@ -456,7 +456,7 @@ def page_ams_report():
         return
 
     # ----- Filters -------------------------------------------------------
-    with st.expander("Filters", expanded=True):
+    with st.expander("Filters", expanded=False):
         f1, f2, f3 = st.columns(3)
         regions = sorted([r for r in df["region"].dropna().unique() if r])
         clusters = sorted([c for c in df["cluster"].dropna().unique() if c])
@@ -537,96 +537,104 @@ def page_ams_report():
 
     # Use the filtered frame so region/cluster/store filters apply here too.
     if "past_ams_slab" in fdf.columns and "current_ams_slab" in fdf.columns and not fdf.empty:
-        pivot = pd.crosstab(
-            fdf["past_ams_slab"].fillna("No Data"),
-            fdf["current_ams_slab"].fillna("No Data"),
-            margins=True,
-            margins_name="Grand Total",
-        )
+        # Drop rows missing either past or current slab — they're not useful for
+        # a transition view and the user doesn't want a "No Data" bucket.
+        slab_known = fdf["past_ams_slab"].isin(slab_order) & fdf["current_ams_slab"].isin(slab_order)
+        tx_df = fdf.loc[slab_known].copy()
 
-        # Force consistent ordering — known slabs first, "No Data" last, Grand Total at end
-        def _ordered_axis(values):
-            extras = [v for v in values if v not in slab_order and v != "Grand Total"]
-            ordered = [s for s in slab_order if s in values] + sorted(extras)
-            if "Grand Total" in values:
-                ordered.append("Grand Total")
-            return ordered
+        if tx_df.empty:
+            st.info(
+                "No customers in the current filter have both a past 6-month AMS slab "
+                "and a current AMS slab — the transition matrix is empty."
+            )
+        else:
+            pivot = pd.crosstab(
+                tx_df["past_ams_slab"],
+                tx_df["current_ams_slab"],
+                margins=True,
+                margins_name="Grand Total",
+            )
 
-        pivot = pivot.reindex(
-            index=_ordered_axis(pivot.index.tolist()),
-            columns=_ordered_axis(pivot.columns.tolist()),
-            fill_value=0,
-        )
-        pivot.index.name = "Past 6M AMS Slab"
-        pivot.columns.name = "Current AMS Slab"
+            # Reindex strictly to known slab order + Grand Total at the end.
+            def _ordered_axis(values):
+                ordered = [s for s in slab_order if s in values]
+                if "Grand Total" in values:
+                    ordered.append("Grand Total")
+                return ordered
 
-        def _color_cells(df):
-            styles = pd.DataFrame("", index=df.index, columns=df.columns)
-            for r in df.index:
-                for c in df.columns:
-                    if r == "Grand Total" or c == "Grand Total":
-                        styles.loc[r, c] = (
-                            "background-color: #1F1F2E; color: white; font-weight: 700;"
-                        )
-                    elif r in slab_order and c in slab_order:
+            pivot = pivot.reindex(
+                index=_ordered_axis(pivot.index.tolist()),
+                columns=_ordered_axis(pivot.columns.tolist()),
+                fill_value=0,
+            )
+            pivot.index.name = "Past 6M AMS Slab"
+            pivot.columns.name = "Current AMS Slab"
+
+            def _color_cells(df):
+                styles = pd.DataFrame("", index=df.index, columns=df.columns)
+                for r in df.index:
+                    for c in df.columns:
+                        if r == "Grand Total" or c == "Grand Total":
+                            styles.loc[r, c] = (
+                                "background-color: #1F1F2E; color: white; font-weight: 700;"
+                            )
+                        elif r in slab_order and c in slab_order:
+                            ri = slab_order.index(r)
+                            ci = slab_order.index(c)
+                            if ri == ci:
+                                styles.loc[r, c] = (
+                                    "background-color: #4FC3F7; color: white; font-weight: 600;"
+                                )
+                            elif ci > ri:
+                                styles.loc[r, c] = (
+                                    "background-color: #66BB6A; color: white;"
+                                )
+                            else:
+                                styles.loc[r, c] = (
+                                    "background-color: #F5A623; color: white;"
+                                )
+                return styles
+
+            styled = pivot.style.apply(_color_cells, axis=None).format("{:,.0f}")
+            st.dataframe(styled, use_container_width=True, height=560)
+
+            # Quick movement summary (Grand Total excluded)
+            body = pivot.drop(index=["Grand Total"], errors="ignore").drop(columns=["Grand Total"], errors="ignore")
+            upgraded = downgraded = stayed = 0
+            for r in body.index:
+                for c in body.columns:
+                    if r in slab_order and c in slab_order:
+                        val = int(body.loc[r, c])
                         ri = slab_order.index(r)
                         ci = slab_order.index(c)
                         if ri == ci:
-                            styles.loc[r, c] = (
-                                "background-color: #4FC3F7; color: white; font-weight: 600;"
-                            )
+                            stayed += val
                         elif ci > ri:
-                            styles.loc[r, c] = (
-                                "background-color: #66BB6A; color: white;"
-                            )
+                            upgraded += val
                         else:
-                            styles.loc[r, c] = (
-                                "background-color: #F5A623; color: white;"
-                            )
-                    else:
-                        styles.loc[r, c] = "background-color: #ECEFF4;"
-            return styles
+                            downgraded += val
+            total = upgraded + downgraded + stayed
+            if total:
+                c1, c2, c3 = st.columns(3)
+                c1.markdown(
+                    kpi_card("Upgraded", fmt_int(upgraded), f"{upgraded/total*100:.1f}% of base"),
+                    unsafe_allow_html=True,
+                )
+                c2.markdown(
+                    kpi_card("Stayed Same", fmt_int(stayed), f"{stayed/total*100:.1f}% of base"),
+                    unsafe_allow_html=True,
+                )
+                c3.markdown(
+                    kpi_card("Downgraded", fmt_int(downgraded), f"{downgraded/total*100:.1f}% of base"),
+                    unsafe_allow_html=True,
+                )
 
-        styled = pivot.style.apply(_color_cells, axis=None).format("{:,.0f}")
-        st.dataframe(styled, use_container_width=True, height=560)
-
-        # Quick movement summary (only known slabs, ignore Grand Total + No Data)
-        body = pivot.drop(index=["Grand Total"], errors="ignore").drop(columns=["Grand Total"], errors="ignore")
-        upgraded = downgraded = stayed = 0
-        for r in body.index:
-            for c in body.columns:
-                if r in slab_order and c in slab_order:
-                    val = int(body.loc[r, c])
-                    ri = slab_order.index(r)
-                    ci = slab_order.index(c)
-                    if ri == ci:
-                        stayed += val
-                    elif ci > ri:
-                        upgraded += val
-                    else:
-                        downgraded += val
-        total = upgraded + downgraded + stayed
-        if total:
-            c1, c2, c3 = st.columns(3)
-            c1.markdown(
-                kpi_card("Upgraded", fmt_int(upgraded), f"{upgraded/total*100:.1f}% of base"),
-                unsafe_allow_html=True,
+            st.download_button(
+                "⬇️ Download transition matrix CSV",
+                data=df_to_csv_bytes(pivot.reset_index()),
+                file_name=f"ams_slab_transition_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
             )
-            c2.markdown(
-                kpi_card("Stayed Same", fmt_int(stayed), f"{stayed/total*100:.1f}% of base"),
-                unsafe_allow_html=True,
-            )
-            c3.markdown(
-                kpi_card("Downgraded", fmt_int(downgraded), f"{downgraded/total*100:.1f}% of base"),
-                unsafe_allow_html=True,
-            )
-
-        st.download_button(
-            "⬇️ Download transition matrix CSV",
-            data=df_to_csv_bytes(pivot.reset_index()),
-            file_name=f"ams_slab_transition_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-        )
 
 
 # ---------------------------------------------------------------------------
