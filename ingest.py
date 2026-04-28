@@ -51,11 +51,38 @@ def _to_period_str(d: pd.Series) -> pd.Series:
 
 
 def _parse_date(s: pd.Series, fmts: Iterable[str] = ()) -> pd.Series:
-    """Try a set of explicit formats then fallback to dateutil."""
+    """Parse dates robustly.
+
+    Order of attempts:
+      1. ISO 8601 (e.g. ``2025-07-01`` or ``2025-07-01T18:25``).
+      2. Explicit Indian dd-mm-yyyy formats with optional time component
+         (e.g. ``01-07-2025`` or ``01-07-2025 18:25``). Trying these first
+         avoids ambiguity for values like ``01-07-2025`` which dateutil
+         would otherwise mis-read as 7-Jan when ``dayfirst`` is wrong.
+      3. Fallback to dateutil with ``dayfirst=True`` so any remaining
+         day-month-year variants (``01/07/2025``, ``1-7-2025``, etc.) are
+         interpreted as day-first, matching the source CSVs.
+    """
     out = pd.to_datetime(s, errors="coerce", format="ISO8601")
+
+    explicit_formats = (
+        "%d-%m-%Y %H:%M:%S",
+        "%d-%m-%Y %H:%M",
+        "%d-%m-%Y",
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y",
+    )
+    for fmt in explicit_formats:
+        mask = out.isna()
+        if not mask.any():
+            break
+        attempt = pd.to_datetime(s.where(mask), errors="coerce", format=fmt)
+        out = out.fillna(attempt)
+
     mask = out.isna()
     if mask.any():
-        out2 = pd.to_datetime(s.where(mask), errors="coerce", dayfirst=False)
+        out2 = pd.to_datetime(s.where(mask), errors="coerce", dayfirst=True)
         out = out.fillna(out2)
     return out
 
