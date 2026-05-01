@@ -31,13 +31,16 @@ def _bill_slab(value: float) -> str:
 
 
 def _ams_slab(value: float) -> str:
-    if pd.isna(value) or value == 0:
+    # Treat blanks, zeros and negatives (returns / reversals) as the lowest
+    # slab — otherwise negatives fall through every range check and end up
+    # bucketed as "No Data", which is misleading on the dashboard.
+    if pd.isna(value) or value <= 0:
         return "0 to 500"
     for label, lo, hi in AMS_SLABS:
         lo_ok = (lo is None) or value > lo
         hi_ok = (hi is None) or value <= hi
         # The first slab "0 to 500" should include 0 — special-case
-        if label == "0 to 500" and value <= 500 and value >= 0:
+        if label == "0 to 500" and value <= 500:
             return label
         if lo_ok and hi_ok:
             return label
@@ -70,13 +73,76 @@ def _past_window(enroll_period: pd.Timestamp) -> tuple[pd.Timestamp, pd.Timestam
 
 
 # ---------------------------------------------------------------------------
+# Period discovery helpers (used by the UI to populate the month picker)
+# ---------------------------------------------------------------------------
+def available_periods() -> list[pd.Timestamp]:
+    """Return a sorted list of unique month-start Timestamps present in any
+    of the loaded source tables (shopping / customer trend / redemption).
+
+    The UI uses this to populate the "Report Month" selector so the analyst
+    can choose which month to build the report for, instead of defaulting to
+    the auto-detected max across all files (which can be off by one if, e.g.,
+    redemption credits for April land on 1-May).
+    """
+    periods: set[pd.Timestamp] = set()
+    try:
+        shopping = db.fetch_df("SELECT DISTINCT period FROM shopping")
+        if not shopping.empty:
+            periods.update(pd.to_datetime(shopping["period"], errors="coerce").dropna())
+    except Exception:
+        pass
+    try:
+        trend = db.fetch_df("SELECT DISTINCT month_start FROM customer_trend")
+        if not trend.empty:
+            periods.update(pd.to_datetime(trend["month_start"], errors="coerce").dropna())
+    except Exception:
+        pass
+    try:
+        redemption = db.fetch_df("SELECT DISTINCT txn_period FROM redemption")
+        if not redemption.empty:
+            periods.update(pd.to_datetime(redemption["txn_period"], errors="coerce").dropna())
+    except Exception:
+        pass
+
+    return sorted(periods)
+
+
+def smart_default_period() -> pd.Timestamp | None:
+    """Pick a sensible default report month.
+
+    Preference order:
+      1. Latest month for which Shopping has data (this is what an analyst
+         actually means by "the month I'm reporting on").
+      2. Latest month for which Customer Trend has data.
+      3. Latest month for which Redemption has data.
+    """
+    for table, col in (("shopping", "period"),
+                       ("customer_trend", "month_start"),
+                       ("redemption", "txn_period")):
+        try:
+            df = db.fetch_df(f"SELECT MAX({col}) AS m FROM {table}")
+            if not df.empty and pd.notna(df["m"].iloc[0]):
+                return pd.to_datetime(df["m"].iloc[0])
+        except Exception:
+            continue
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Core build
 # ---------------------------------------------------------------------------
-def build_ams_report() -> pd.DataFrame:
+def build_ams_report(report_period: str | pd.Timestamp | None = None) -> pd.DataFrame:
     """Compute the full AMS Migration Report by joining the five data sources.
 
+    Args:
+        report_period: Optional override for the "current" period the report
+            covers. Accepts a ``YYYY-MM-DD`` string or a ``pd.Timestamp`` (any
+            day in the target month — it's normalised to month-start). If
+            ``None``, falls back to the legacy behaviour of taking the max
+            period across shopping / trend / redemption.
+
     Returns a DataFrame with the canonical column names listed in the spec, in
-    the order requested. Stores it back in `ams_report_cache` for fast reads.
+    the order requested. Stores it back in ``ams_report_cache`` for fast reads.
     """
     membership = db.fetch_df("SELECT * FROM membership")
     shopping = db.fetch_df("SELECT * FROM shopping")
@@ -89,17 +155,22 @@ def build_ams_report() -> pd.DataFrame:
     if membership.empty:
         return pd.DataFrame()
 
-    # ----- Determine the "current" period (latest data we have) ----------
-    candidate_periods: list[pd.Timestamp] = []
-    if not shopping.empty:
-        candidate_periods.append(pd.to_datetime(shopping["period"]).max())
-    if not trend.empty:
-        candidate_periods.append(pd.to_datetime(trend["month_start"]).max())
-    if not redemption.empty:
-        candidate_periods.append(pd.to_datetime(redemption["txn_period"]).max())
-    if not candidate_periods:
-        return pd.DataFrame()
-    current_period = max(candidate_periods)
+    # ----- Determine the "current" period -------------------------------
+    if report_period is not None:
+        # User-supplied — normalise to first-of-month timestamp.
+        current_period = pd.to_datetime(report_period).to_period("M").to_timestamp()
+    else:
+        # Legacy auto-detect: latest period across all loaded sources.
+        candidate_periods: list[pd.Timestamp] = []
+        if not shopping.empty:
+            candidate_periods.append(pd.to_datetime(shopping["period"]).max())
+        if not trend.empty:
+            candidate_periods.append(pd.to_datetime(trend["month_start"]).max())
+        if not redemption.empty:
+            candidate_periods.append(pd.to_datetime(redemption["txn_period"]).max())
+        if not candidate_periods:
+            return pd.DataFrame()
+        current_period = max(candidate_periods)
     current_period_str = current_period.strftime("%Y-%m-%d")
 
     db.set_meta("current_period", current_period_str)
