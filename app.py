@@ -913,6 +913,50 @@ def page_upload():
     redm_file = c3.file_uploader("Redemption CSV", type=["csv"], key="upload_red")
     trend_file = c4.file_uploader("Customer Trend CSV (UTF-16, tab-separated)", type=["csv"], key="upload_trend")
 
+    # ----- Report-month selector ----------------------------------------
+    # By default the report is built for the latest month found across the
+    # uploaded files. But sometimes the redemption file contains a few
+    # transactions that posted on the 1st of the *next* month (auto-credits
+    # for the previous month's purchases), which would push "current period"
+    # forward to a month for which Shopping has no data — making the report
+    # show zeros. The selector below lets you pin the report to a specific
+    # month.
+    st.markdown("### Report month")
+    available = processing.available_periods()
+    smart_default = processing.smart_default_period()
+
+    if available:
+        # Newest first so the most likely choice sits at the top of the list.
+        options = list(reversed(available))
+        labels = [p.strftime("%b-%Y") for p in options]
+
+        if smart_default is not None and smart_default in options:
+            default_idx = options.index(smart_default)
+        else:
+            default_idx = 0
+
+        chosen_label = st.selectbox(
+            "Build the report for which month?",
+            labels,
+            index=default_idx,
+            key="report_month_picker",
+            help=(
+                "Defaults to the latest month with Shopping data. Change it "
+                "if you've uploaded data through a particular month-end and "
+                "the auto-detected period is rolling forward into the next "
+                "month because of redemption auto-credits."
+            ),
+        )
+        chosen_period = options[labels.index(chosen_label)]
+        chosen_period_str = chosen_period.strftime("%Y-%m-%d")
+    else:
+        st.info(
+            "No data loaded yet — upload at least one file below, then come "
+            "back to pick a report month."
+        )
+        chosen_period = None
+        chosen_period_str = None
+
     if st.button("🔄 Process uploaded files & rebuild reports", type="primary", use_container_width=True):
         load_steps = []
         progress = st.progress(0.0, text="Starting...")
@@ -952,8 +996,20 @@ def page_upload():
                 done += 1
                 progress.progress(done / step_n)
 
-            progress.progress(done / step_n, text="Building AMS Migration Report...")
-            ams = processing.build_ams_report()
+            # If files were just uploaded, the period list might have changed —
+            # fall back to the smart default if the previously-chosen period no
+            # longer exists.
+            build_period = chosen_period_str
+            if build_period is None:
+                fresh_default = processing.smart_default_period()
+                build_period = fresh_default.strftime("%Y-%m-%d") if fresh_default is not None else None
+
+            period_msg = (
+                pd.to_datetime(build_period).strftime("%b-%Y")
+                if build_period else "auto-detected"
+            )
+            progress.progress(done / step_n, text=f"Building AMS Migration Report for {period_msg}...")
+            ams = processing.build_ams_report(report_period=build_period)
             done += 1
             progress.progress(done / step_n, text="Building Renewal Report...")
             ren = renewal.build_renewal_report()
@@ -967,12 +1023,46 @@ def page_upload():
 
             if load_steps:
                 st.success("✅ Loaded:\n\n- " + "\n- ".join(load_steps))
-            st.success(f"✅ Reports rebuilt — {len(ams):,} customer rows, {len(ren):,} store-month renewal rows.")
+            st.success(
+                f"✅ Reports rebuilt for **{period_msg}** — {len(ams):,} customer rows, "
+                f"{len(ren):,} store-month renewal rows."
+            )
 
         except Exception as e:
             progress.empty()
             st.error(f"❌ Processing failed: {e}")
             st.exception(e)
+
+    # ----- Rebuild-only (no re-upload) ----------------------------------
+    # Useful when the data is already loaded and you just want to switch the
+    # report month — e.g. you uploaded files dated through 30-Apr but the
+    # report initially built for May because of stray May-1 auto-credits in
+    # the redemption file. Pick April above and click rebuild.
+    if available:
+        st.markdown("---")
+        st.markdown("### Rebuild reports for selected month")
+        st.caption(
+            "Already uploaded the files? Pick a month above and click below — "
+            "no need to re-upload. This rebuilds the AMS Migration Report and "
+            "Renewals for the chosen month."
+        )
+        if st.button("🛠️ Rebuild reports for selected month", use_container_width=True):
+            try:
+                with st.spinner(
+                    f"Rebuilding for {chosen_period.strftime('%b-%Y')}..."
+                ):
+                    ams = processing.build_ams_report(report_period=chosen_period_str)
+                    ren = renewal.build_renewal_report()
+                cached_ams_report.clear()
+                cached_renewal_report.clear()
+                cached_rewards_html.clear()
+                st.success(
+                    f"✅ Reports rebuilt for **{chosen_period.strftime('%b-%Y')}** — "
+                    f"{len(ams):,} customer rows, {len(ren):,} store-month renewal rows."
+                )
+            except Exception as e:
+                st.error(f"❌ Rebuild failed: {e}")
+                st.exception(e)
 
     st.markdown("---")
     st.markdown("### Danger zone")
