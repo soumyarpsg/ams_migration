@@ -711,14 +711,14 @@ def page_renewals():
 
     with g2:
         tier = pd.DataFrame({
-            "Tier": ["Gold", "Black", "Platinum"],
+            "Tier": ["Gold", "Platinum", "Diamond"],
             "Renewals": [int(fdf["gold_renewals"].sum()),
-                         int(fdf["black_renewals"].sum()),
-                         int(fdf["platinum_renewals"].sum())],
+                         int(fdf["platinum_renewals"].sum()),
+                         int(fdf["diamond_renewals"].sum())],
         })
         fig = px.bar(tier, x="Tier", y="Renewals", title="Renewals by plan tier",
                      color="Tier",
-                     color_discrete_map={"Gold": "#D4AF37", "Black": "#1F1F2E", "Platinum": "#A6AAB1"})
+                     color_discrete_map={"Gold": "#D4AF37", "Platinum": "#1F1F2E", "Diamond": "#A6AAB1"})
         fig.update_layout(margin=dict(l=10, r=10, t=40, b=10), height=380, showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
 
