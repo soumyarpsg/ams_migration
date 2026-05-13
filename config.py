@@ -20,7 +20,7 @@ DEFAULT_ADMIN_PASSWORD = "spencers@2026"
 INVALID_MOBILES = {"0", "9999999999"}
 
 # Plan tier mapping by plan cost
-PLAN_TIER = {500: "Gold", 750: "Black", 1000: "Platinum"}
+PLAN_TIER = {500: "Gold", 750: "Platinum", 1000: "Diamond"}
 
 # Bill slab definitions (lower bound exclusive, upper bound inclusive)
 # (label, min_exclusive, max_inclusive)  -- min_exclusive=None means no lower bound
