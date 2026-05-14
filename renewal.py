@@ -71,13 +71,13 @@ def build_renewal_report() -> pd.DataFrame:
         ren_df.groupby(["registered_store_code", "activity_month", "plan_tier"])
         .size().unstack(fill_value=0).reset_index()
     )
-    for col in ("Gold", "Black", "Platinum"):
+    for col in ("Gold", "Platinum", "Diamond"):
         if col not in ren_tier.columns:
             ren_tier[col] = 0
     ren_tier = ren_tier.rename(columns={
         "Gold": "gold_renewals",
-        "Black": "black_renewals",
         "Platinum": "platinum_renewals",
+        "Diamond": "diamond_renewals",
     })
 
     # Previously Registered: memberships that EXPIRED in (store, month).
@@ -119,7 +119,7 @@ def build_renewal_report() -> pd.DataFrame:
                on=["registered_store_code", "activity_month"], how="left")
     )
     for col in ("new_acquisitions", "renewals", "previously_registered",
-                "gold_renewals", "black_renewals", "platinum_renewals"):
+                "gold_renewals", "platinum_renewals", "diamond_renewals"):
         if col not in out.columns:
             out[col] = 0
         out[col] = out[col].fillna(0).astype(int)
@@ -144,7 +144,7 @@ def build_renewal_report() -> pd.DataFrame:
         "period", "period_label",
         "new_acquisitions", "renewals", "previously_registered",
         "renewal_pct",
-        "gold_renewals", "black_renewals", "platinum_renewals",
+        "gold_renewals", "platinum_renewals", "diamond_renewals",
     ]].fillna({"store_name": "", "region": "", "cluster": "", "city": "", "format": ""})
 
     out = out.sort_values(["store_code", "period"]).reset_index(drop=True)
@@ -166,8 +166,8 @@ DISPLAY_RENEWAL_MAP = {
     "previously_registered": "Previously Registered",
     "renewal_pct": "Renewal %",
     "gold_renewals": "Gold Renewals",
-    "black_renewals": "Black Renewals",
     "platinum_renewals": "Platinum Renewals",
+    "diamond_renewals": "Diamond Renewals",
 }
 
 
