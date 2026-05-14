@@ -205,8 +205,8 @@ CREATE TABLE IF NOT EXISTS renewal_cache (
     previously_registered INTEGER,
     renewal_pct REAL,
     gold_renewals INTEGER,
-    black_renewals INTEGER,
-    platinum_renewals INTEGER
+    platinum_renewals INTEGER,
+    diamond_renewals INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS ix_renewal_store ON renewal_cache(store_code);
